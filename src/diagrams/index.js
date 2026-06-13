@@ -71,7 +71,10 @@ export class DiagramManager {
     }
 
     try {
-      await adapter.render(code, target, { isDark, lang, config: this.config });
+      await this._withTimeout(
+        adapter.render(code, target, { isDark, lang, config: this.config }),
+        25000
+      );
       target.setAttribute('data-zoomable', '');
       // Cache string-based outputs (svg / remote <img>); skip blob: URLs.
       if (!/blob:/.test(target.innerHTML)) {
@@ -80,6 +83,15 @@ export class DiagramManager {
     } catch (err) {
       this._fallback(target, code, lang, err && err.message ? err.message : String(err));
     }
+  }
+
+  _withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('diagram render timed out')), ms)
+      ),
+    ]);
   }
 
   _fallback(target, code, lang, message) {

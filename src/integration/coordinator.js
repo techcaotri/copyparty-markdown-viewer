@@ -40,8 +40,10 @@ export class RenderCoordinator {
   async render(text, filePath, hostEl) {
     if (!hostEl) throw new Error('RenderCoordinator.render requires a host element');
 
+    // KaTeX HTML is produced synchronously by the bundled engine; its stylesheet is
+    // only for visual polish, so load it without blocking the render.
     if (this.config.mathRenderer === 'KaTeX' && /\$|\\\(|\\\[/.test(text)) {
-      await this.loader.ensureKatexCss();
+      this.loader.ensureKatexCss();
     }
 
     const key = this.cache.hash(text);

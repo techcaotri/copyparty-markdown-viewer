@@ -30,7 +30,7 @@
     "build:assets": "node scripts/copy-assets.mjs",
     "dev": "node build.mjs --watch",
     "clean": "rm -rf dist",
-    "test": "node test/smoke.mjs && node test/plantuml.mjs",
+    "test": "node test/smoke.mjs && node test/plantuml.mjs && node build.mjs && node test/integration.mjs",
     "serve:demo": "node scripts/serve-demo.mjs"
   },
   "dependencies": {
@@ -47,6 +47,7 @@
     "pako": "^2.1.0"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.24.0",
+    "jsdom": "^24.1.3"
   }
 }

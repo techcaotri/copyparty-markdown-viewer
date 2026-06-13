@@ -24,14 +24,24 @@ export class LibraryLoader {
     return p;
   }
 
-  loadScript(url) {
+  loadScript(url, timeoutMs = 20000) {
     return this._once('script:' + url, () =>
       new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = url;
         s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error('Failed to load script: ' + url));
+        const timer = setTimeout(
+          () => reject(new Error('Timed out loading script: ' + url)),
+          timeoutMs
+        );
+        s.onload = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        s.onerror = () => {
+          clearTimeout(timer);
+          reject(new Error('Failed to load script: ' + url));
+        };
         document.head.appendChild(s);
       })
     );
