@@ -49,28 +49,40 @@ npm run build          # -> dist/markdown-plus.js + dist/markdown-plus.css
 
 ### 2. Load it into copyparty
 
+copyparty's **markdown viewer** page (shown when you open a `.md`, i.e. `?v`) is
+injected via **`--js-other`** — not `--js-browser` (which only covers the file-browser
+page). The plugin is a single self-contained JS file and injects its own CSS, so no
+`--css-browser` is needed. The bundle must be reachable by URL; the easiest way is to
+serve it from one of your copyparty volumes.
+
 ```bash
-copyparty \
-  --js-browser  /abs/path/dist/markdown-plus.js \
-  --css-browser /abs/path/dist/markdown-plus.css
+# If /home/tripham/Dev is shared as /dev, the built bundle is reachable at
+#   /dev/Playground_Copyparty/copyparty-markdown-viewer/dist/markdown-plus.js
+copyparty -c /etc/copyparty/args.conf \
+  --js-other  /dev/Playground_Copyparty/copyparty-markdown-viewer/dist/markdown-plus.js \
+  --js-browser /dev/Playground_Copyparty/copyparty-markdown-viewer/dist/markdown-plus.js \
+  --html-head '<script>window.MDPLUS_CONFIG={diagramBackend:"mermaid+puml"}</script>'
 ```
 
-Open a `.md` file in the copyparty web UI — it renders with diagrams, math, a ToC,
-search, and export controls (a floating toolbar appears top-right).
+Or just use the ready-made launcher (mirrors your `start_copyparty.sh` and adds the
+plugin): [`start_copyparty.sh`](start_copyparty.sh).
 
-> The exact selector copyparty uses for its Markdown viewer varies by version. The
-> plugin detects Markdown views via a MutationObserver + URL heuristics and renders
-> into a known container or its own host. If your copyparty version uses a different
-> container, set `viewerSelector` (see Configuration).
+Open a `.md` file in the copyparty web UI — it renders with diagrams, math, a ToC,
+search, and export controls (a floating toolbar appears top-right). The plugin reads
+the raw markdown from copyparty's `#mt` textarea, renders into `#mw`, and hides
+copyparty's native output/ToC.
+
+> Verified against copyparty v1.20.2. If a future version changes the viewer DOM,
+> set `viewerSelector` (see Configuration); the detector also falls back to a
+> MutationObserver + URL heuristics.
 
 ## Configuration
 
 Set `window.MDPLUS_CONFIG` before the bundle loads, using copyparty's `--html-head`:
 
 ```bash
-copyparty \
-  --js-browser  /abs/path/dist/markdown-plus.js \
-  --css-browser /abs/path/dist/markdown-plus.css \
+copyparty -c /etc/copyparty/args.conf \
+  --js-other  /dev/.../dist/markdown-plus.js \
   --html-head '<script>window.MDPLUS_CONFIG={diagramBackend:"kroki",diagramBackendUrl:"/kroki"}</script>'
 ```
 
@@ -140,7 +152,13 @@ requests**.
 npm run dev          # esbuild watch
 npm run serve:demo   # http://localhost:8099/demo/  (loads dist/, renders a sample)
 npm test             # unit (render + encoder) + jsdom integration test
+npm run test:e2e     # headless-Chrome test against a running copyparty (see below)
 ```
+
+The e2e test (`test/e2e.mjs`, uses `playwright-core` + system Chrome) drives a real
+copyparty markdown viewer and checks Mermaid, math, highlighting, the toolbar/ToC,
+and graceful PlantUML fallback. Point it at a server with env vars: `BASE`, `CPPW`
+(password), `MDPATH` (viewer file path).
 
 Project layout:
 
@@ -151,7 +169,9 @@ src/diagrams/      index.js (DiagramManager) + mermaid/plantuml/kroki adapters
 src/features/      index.js (FeatureUI) + toc/search/zoom/export/theme-bridge
 src/vendor/mpu/    copied MPU source (do not edit; re-run the vendor script)
 scripts/           vendor-from-mpu.sh, copy-assets.mjs, serve-demo.mjs
-test/              smoke.mjs, plantuml.mjs, integration.mjs
+test/              smoke.mjs, plantuml.mjs, integration.mjs (jsdom), e2e.mjs (real copyparty)
+examples/          sample.md (feature showcase)
+start_copyparty.sh launcher: your args.conf + the plugin
 build.mjs          esbuild bundler
 ```
 

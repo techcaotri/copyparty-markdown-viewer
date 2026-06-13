@@ -17,3 +17,6 @@ npm-debug.log*
 # Temp
 .tmp/
 *.tgz
+
+# Generated e2e screenshot
+test/e2e-screenshot.png

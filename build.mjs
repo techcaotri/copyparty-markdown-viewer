@@ -33,11 +33,10 @@ const options = {
   legalComments: 'none',
   logLevel: 'info',
   loader: {
-    '.css': 'css',
-    '.svg': 'dataurl',
-    '.ttf': 'dataurl',
-    '.woff': 'dataurl',
-    '.woff2': 'dataurl',
+    // CSS is imported as a string and injected at runtime, so the plugin is a
+    // single self-contained JS file (works via copyparty --js-other and --js-browser
+    // with no separate --css-browser needed).
+    '.css': 'text',
   },
   banner: {
     js: '/* copyparty-markdown-viewer - self-contained Markdown plugin. MIT. */',
@@ -53,5 +52,5 @@ if (watch) {
   console.log('[build] watching for changes...');
 } else {
   await esbuild.build(options);
-  console.log('[build] wrote dist/markdown-plus.js + dist/markdown-plus.css');
+  console.log('[build] wrote dist/markdown-plus.js (CSS inlined)');
 }

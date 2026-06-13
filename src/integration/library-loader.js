@@ -71,19 +71,36 @@ export class LibraryLoader {
     });
   }
 
-  /** Load Mermaid (UMD) once and return the global instance. */
+  /**
+   * Load Mermaid once and return the instance.
+   *
+   * Mermaid v11 ships an ES module (its UMD build no longer exposes a window
+   * global), so we dynamic-import the ESM build and use its default export. The
+   * import() is built via Function() so the bundler leaves it as a real runtime
+   * import of the (possibly remote) URL.
+   */
   async ensureMermaid() {
     if (this.mermaid) return this.mermaid;
-    if (typeof window !== 'undefined' && window.mermaid) {
+    // Only trust a pre-existing global if it's actually the Mermaid API. (Copyparty's
+    // page can expose an unrelated `window.mermaid`, e.g. a DOM collection.)
+    if (typeof window !== 'undefined' && this._isMermaid(window.mermaid)) {
       this.mermaid = window.mermaid;
       return this.mermaid;
     }
     const url =
       this.config.mermaidUrl ||
-      `${this.config.assetBaseUrl}/mermaid@11/dist/mermaid.min.js`;
-    await this.loadScript(url);
-    if (!window.mermaid) throw new Error('Mermaid loaded but window.mermaid is undefined');
-    this.mermaid = window.mermaid;
+      `${this.config.assetBaseUrl}/mermaid@11/dist/mermaid.esm.min.mjs`;
+    const dynamicImport = this._dynamicImport || (this._dynamicImport = new Function('u', 'return import(u)'));
+    const mod = await dynamicImport(url);
+    const picked = (mod && (mod.default || mod.mermaid)) || mod;
+    if (!this._isMermaid(picked)) {
+      throw new Error('Mermaid module loaded but has no initialize()/render()');
+    }
+    this.mermaid = picked;
     return this.mermaid;
+  }
+
+  _isMermaid(obj) {
+    return !!obj && typeof obj.render === 'function' && typeof obj.initialize === 'function';
   }
 }

@@ -9,7 +9,10 @@
  */
 const MD_URL_RE = /\.(md|markdown|mkd|mdown|mdwn|mkdn|text|txt)(\?|#|$)/i;
 
-const HOST_CANDIDATES = ['#mdplus-root', '#mw', '#mhtml', '.mdo', '#bdoc', '#doc'];
+// Preferred render hosts. On copyparty's markdown viewer (md.html) the wrapper is
+// #mw (containing #ml loading text and #mp.mdo output); we render into #mw and hide
+// copyparty's native nodes (handled in the coordinator).
+const HOST_CANDIDATES = ['#mdplus-root', '#mw', '#mp', '.mdo', '#mhtml', '#bdoc', '#doc'];
 
 export class MarkdownViewDetector {
   constructor(config) {

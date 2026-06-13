@@ -5,8 +5,17 @@
  * renders them with the vendored pipeline. Also exposes a small programmatic API on
  * `window.mdPlus` for demos, tests, and manual control.
  */
-import './styles.css';
+import cssText from './styles.css';
 import { resolveConfig } from './config.js';
+
+function injectStyles() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('mdplus-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'mdplus-styles';
+  style.textContent = cssText;
+  (document.head || document.documentElement).appendChild(style);
+}
 import { LibraryLoader } from './library-loader.js';
 import { RenderCache } from './cache.js';
 import { HtmlSanitizer } from './sanitizer.js';
@@ -41,6 +50,7 @@ export class MarkdownPlusPlugin {
   init() {
     if (this._inited) return;
     this._inited = true;
+    injectStyles();
     this.detector.observe(({ text, host, filePath }) => {
       this.coordinator.render(text, filePath, host).catch((err) => {
         console.error('[mdplus] render failed', err);
@@ -50,6 +60,7 @@ export class MarkdownPlusPlugin {
 
   /** Render markdown text directly into an element (demo / test / manual use). */
   renderInto(el, text, filePath) {
+    injectStyles();
     return this.coordinator.render(text, filePath || '', el);
   }
 

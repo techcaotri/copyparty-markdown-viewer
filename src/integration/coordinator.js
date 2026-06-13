@@ -28,9 +28,15 @@ export class RenderCoordinator {
   resolveTheme() {
     const t = this.config.theme;
     if (t === 'light' || t === 'dark') return t;
-    // 'auto': follow copyparty's body class if present, else OS preference.
+    // 'auto': follow copyparty's theme, else OS preference.
+    // copyparty's markdown viewer sets <html class="z"> for dark, "y" for light.
+    const root = document.documentElement;
+    if (root) {
+      const cls = root.className || '';
+      if (/\bz\b/.test(cls)) return 'dark';
+      if (/\by\b/.test(cls)) return 'light';
+    }
     const body = document.body;
-    if (body && /\b(dark|y)\b/.test(body.getAttribute('data-theme') || '')) return 'dark';
     if (body && body.classList.contains('dark')) return 'dark';
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
       return 'dark';
@@ -55,19 +61,21 @@ export class RenderCoordinator {
 
     const container = this._mount(html, hostEl);
 
-    if (this.diagrams) {
-      try {
-        await this.diagrams.process(container);
-      } catch (err) {
-        console.warn('[mdplus] diagram processing failed', err);
-      }
-    }
-
+    // Mount the feature UI first so it appears immediately and never waits on a slow
+    // or hanging diagram backend; diagrams upgrade asynchronously afterwards.
     if (this.features) {
       try {
         this.features.mountAll(container, { filePath, sourceText: text });
       } catch (err) {
         console.warn('[mdplus] feature mount failed', err);
+      }
+    }
+
+    if (this.diagrams) {
+      try {
+        await this.diagrams.process(container);
+      } catch (err) {
+        console.warn('[mdplus] diagram processing failed', err);
       }
     }
 
@@ -81,6 +89,19 @@ export class RenderCoordinator {
     const theme = this.resolveTheme();
     hostEl.classList.add('mdplus-host');
     hostEl.setAttribute('data-mdplus-theme', theme);
+
+    // Hide copyparty's native markdown output so ours is authoritative on the
+    // markdown viewer page: #ml = "Loading", #mp = copyparty's rendered output,
+    // #toc = copyparty's table of contents (its links point into the hidden #mp, so
+    // hide it and use the plugin's own ToC instead).
+    const nativeSelectors = ['#ml', '#mp', '#toc'];
+    for (const sel of nativeSelectors) {
+      const native = hostEl.querySelector(sel) || document.querySelector(sel);
+      if (native && !native.classList.contains('mdplus-content')) {
+        native.style.display = 'none';
+        native.setAttribute('data-mdplus-hidden', '');
+      }
+    }
 
     let wrapper = hostEl.querySelector(':scope > .mdplus-content');
     if (!wrapper) {
