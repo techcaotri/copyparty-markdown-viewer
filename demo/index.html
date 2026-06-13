@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>copyparty-markdown-viewer demo</title>
+    <link rel="stylesheet" href="../dist/markdown-plus.css" />
+    <style>
+      body { margin: 0; background: #fff; }
+      .toolbar { padding: 10px 16px; border-bottom: 1px solid #d0d7de; font-family: sans-serif; }
+      button { margin-right: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <strong>mdplus demo</strong>
+      <button id="toggle-theme">Toggle theme</button>
+      <span id="status"></span>
+    </div>
+    <div id="app"></div>
+
+    <!-- Configure before the bundle loads. -->
+    <script>
+      window.MDPLUS_CONFIG = {
+        autoInit: false, // demo renders manually
+        // For PlantUML, point at a server (public shown for demo only):
+        diagramBackend: 'mermaid+puml',
+        diagramBackendUrl: 'https://www.plantuml.com/plantuml',
+      };
+    </script>
+    <script src="../dist/markdown-plus.js"></script>
+    <script>
+      const SAMPLE = String.raw`# Copyparty Markdown Viewer
+
+A **self-contained** plugin demo. Inline math $a^2 + b^2 = c^2$ and a block:
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}
+$$
+
+## Code
+
+` + '```js\n' + `function greet(name) {
+  return ` + '`hello ${name}`' + `;
+}
+` + '```' + `
+
+## Task list
+
+- [x] Render markdown
+- [x] Math
+- [ ] World domination
+
+::: tip Pro tip
+Diagrams are rendered client-side.
+:::
+
+## Mermaid
+
+` + '```mermaid\n' + `flowchart LR
+  A["Open .md"] --> B["Render"]
+  B --> C{"Has diagrams?"}
+  C -->|Yes| D["Upgrade blocks"]
+  C -->|No| E["Done"]
+` + '```' + `
+
+## PlantUML
+
+` + '```plantuml\n' + `@startuml
+Alice -> Bob: Hello
+Bob --> Alice: Hi!
+@enduml
+` + '```' + `
+
+## Table
+
+| Feature | Status |
+|---------|--------|
+| Mermaid | yes    |
+| Math    | yes    |
+`;
+
+      const app = document.getElementById('app');
+      window.mdPlus
+        .renderInto(app, SAMPLE, 'demo.md')
+        .then(() => (document.getElementById('status').textContent = 'rendered ✓'))
+        .catch((e) => (document.getElementById('status').textContent = 'error: ' + e.message));
+
+      document.getElementById('toggle-theme').addEventListener('click', () => {
+        const host = app;
+        const cur = host.getAttribute('data-mdplus-theme');
+        host.setAttribute('data-mdplus-theme', cur === 'dark' ? 'light' : 'dark');
+      });
+    </script>
+  </body>
+</html>

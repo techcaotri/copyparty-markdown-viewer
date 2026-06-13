@@ -1,0 +1,69 @@
+/**
+ * Entry point - MarkdownPlusPlugin composition root + IIFE bootstrap.
+ *
+ * Loaded into copyparty via `--js-browser`. Observes the DOM for Markdown views and
+ * renders them with the vendored pipeline. Also exposes a small programmatic API on
+ * `window.mdPlus` for demos, tests, and manual control.
+ */
+import './styles.css';
+import { resolveConfig } from './config.js';
+import { LibraryLoader } from './library-loader.js';
+import { RenderCache } from './cache.js';
+import { HtmlSanitizer } from './sanitizer.js';
+import { MarkdownViewDetector } from './detector.js';
+import { RenderCoordinator } from './coordinator.js';
+import { MarkdownRenderer } from '../renderer/markdown-renderer.js';
+
+export class MarkdownPlusPlugin {
+  constructor(overrides) {
+    this.config = resolveConfig(overrides);
+    this.loader = new LibraryLoader(this.config);
+    this.renderer = new MarkdownRenderer(this.config);
+    this.sanitizer = new HtmlSanitizer(this.config);
+    this.cache = new RenderCache();
+    this.coordinator = new RenderCoordinator({
+      config: this.config,
+      renderer: this.renderer,
+      sanitizer: this.sanitizer,
+      cache: this.cache,
+      loader: this.loader,
+    });
+    // DiagramManager (Phase 3) and FeatureUI (Phase 4) are wired in here once added.
+    this.detector = new MarkdownViewDetector(this.config);
+    this._inited = false;
+  }
+
+  init() {
+    if (this._inited) return;
+    this._inited = true;
+    this.detector.observe(({ text, host, filePath }) => {
+      this.coordinator.render(text, filePath, host).catch((err) => {
+        console.error('[mdplus] render failed', err);
+      });
+    });
+  }
+
+  /** Render markdown text directly into an element (demo / test / manual use). */
+  renderInto(el, text, filePath) {
+    return this.coordinator.render(text, filePath || '', el);
+  }
+
+  destroy() {
+    this.detector.disconnect();
+    this._inited = false;
+  }
+}
+
+(function bootstrap() {
+  if (typeof window === 'undefined') return;
+  if (window.mdPlusLoaded) return;
+  window.mdPlusLoaded = true;
+
+  const plugin = new MarkdownPlusPlugin(window.MDPLUS_CONFIG_OVERRIDES);
+  window.mdPlus = plugin;
+
+  if (plugin.config.autoInit) {
+    if (document.readyState !== 'loading') plugin.init();
+    else document.addEventListener('DOMContentLoaded', () => plugin.init());
+  }
+})();
