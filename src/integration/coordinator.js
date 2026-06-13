@@ -28,6 +28,14 @@ export class RenderCoordinator {
   resolveTheme() {
     const t = this.config.theme;
     if (t === 'light' || t === 'dark') return t;
+    // A manual choice (from the toolbar toggle) wins over auto-detection so a
+    // re-render does not snap back to copyparty's theme.
+    try {
+      const saved = localStorage.getItem('mdplus-theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch {
+      /* ignore */
+    }
     // 'auto': follow copyparty's theme, else OS preference.
     // copyparty's markdown viewer sets <html class="z"> for dark, "y" for light.
     const root = document.documentElement;
@@ -101,6 +109,15 @@ export class RenderCoordinator {
         native.style.display = 'none';
         native.setAttribute('data-mdplus-hidden', '');
       }
+    }
+
+    // On copyparty's wide-screen layout #mw is fixed with a large left offset to
+    // make room for its (now hidden) #toc. Reclaim the full width so the content is
+    // not pushed right with empty space on the left.
+    if (hostEl.id === 'mw' || hostEl.id === 'mp') {
+      hostEl.style.left = '0';
+      hostEl.style.right = '0';
+      hostEl.style.maxWidth = 'none';
     }
 
     let wrapper = hostEl.querySelector(':scope > .mdplus-content');

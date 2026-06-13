@@ -83,9 +83,13 @@ export class FeatureUI {
     searchBar.appendChild(input);
     searchBar.appendChild(countEl);
 
-    host.appendChild(toolbar);
-    host.appendChild(tocPanel);
-    host.appendChild(searchBar);
+    // Attach the floating chrome to <body>, NOT to the host. copyparty's #mw host
+    // creates a stacking context (and its #mh header has a positive z-index), which
+    // would otherwise paint over our toolbar. On <body> our high z-index wins.
+    const mount = document.body || host;
+    mount.appendChild(toolbar);
+    mount.appendChild(tocPanel);
+    mount.appendChild(searchBar);
 
     const chrome = { toolbar, tocPanel, searchBar, searchUI: { input, countEl } };
 
