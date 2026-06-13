@@ -13,6 +13,7 @@ import { HtmlSanitizer } from './sanitizer.js';
 import { MarkdownViewDetector } from './detector.js';
 import { RenderCoordinator } from './coordinator.js';
 import { MarkdownRenderer } from '../renderer/markdown-renderer.js';
+import { DiagramManager } from '../diagrams/index.js';
 
 export class MarkdownPlusPlugin {
   constructor(overrides) {
@@ -28,7 +29,10 @@ export class MarkdownPlusPlugin {
       cache: this.cache,
       loader: this.loader,
     });
-    // DiagramManager (Phase 3) and FeatureUI (Phase 4) are wired in here once added.
+    this.coordinator.setDiagramManager(
+      new DiagramManager(this.config, this.loader, this.cache)
+    );
+    // FeatureUI (Phase 4) is wired in here once added.
     this.detector = new MarkdownViewDetector(this.config);
     this._inited = false;
   }
