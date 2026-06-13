@@ -1,0 +1,51 @@
+{
+  "name": "copyparty-markdown-viewer",
+  "version": "0.1.0",
+  "description": "A self-contained copyparty browser plugin that renders rich Markdown (Mermaid, PlantUML, math, ToC, search, zoom, export) by vendoring the Markdown-Preview-Unified rendering pipeline into a single --js-browser bundle.",
+  "type": "module",
+  "author": {
+    "name": "Tri Pham",
+    "email": "techcaotri@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/techcaotri/copyparty-markdown-viewer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/techcaotri/copyparty-markdown-viewer.git"
+  },
+  "keywords": [
+    "copyparty",
+    "markdown",
+    "mermaid",
+    "plantuml",
+    "katex",
+    "markdown-it",
+    "plugin",
+    "viewer"
+  ],
+  "main": "dist/markdown-plus.js",
+  "scripts": {
+    "vendor": "bash scripts/vendor-from-mpu.sh",
+    "build": "node build.mjs",
+    "build:assets": "node scripts/copy-assets.mjs",
+    "dev": "node build.mjs --watch",
+    "clean": "rm -rf dist",
+    "serve:demo": "node scripts/serve-demo.mjs"
+  },
+  "dependencies": {
+    "dompurify": "^3.1.7",
+    "highlight.js": "^11.10.0",
+    "katex": "^0.16.11",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-container": "^4.0.0",
+    "markdown-it-emoji": "^3.0.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-task-lists": "^2.1.1",
+    "markdown-it-texmath": "^1.0.0",
+    "pako": "^2.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
