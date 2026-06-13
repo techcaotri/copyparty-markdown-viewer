@@ -7,39 +7,191 @@ that upgrades copyparty's Markdown viewing with **Mermaid** and **PlantUML** dia
 
 It is built by *vendoring* (copying) the rendering pipeline from the
 [Markdown-Preview-Unified](https://github.com/techcaotri/markdown-preview-enhanced)
-(MPU) project and bundling it into a single browser artifact that copyparty loads via
-`--js-browser` / `--css-browser`. There is **no extra service to run** at runtime
-(the only optional external piece is a self-hostable PlantUML/Kroki server, needed
-only for PlantUML/Graphviz diagrams).
+(MPU) project and bundling it into a **single browser artifact** that copyparty loads
+via `--js-browser` / `--css-browser`. There is **no extra service to run** at runtime
+— the only optional external piece is a self-hostable PlantUML/Kroki server, needed
+only for PlantUML/Graphviz diagrams.
 
-> Design rationale, alternatives considered, and the full architecture are documented
-> in the brainstorming document that this implementation follows.
+```
+Copyparty (Python)  --js-browser-->  markdown-plus.js (one bundled artifact)
+                                       |
+   integration/  detector, coordinator, sanitizer, cache, config, loader
+   renderer/     markdown-it pipeline (mirrors MPU engine.ts)
+   diagrams/     DiagramManager + Mermaid / PlantUML / Kroki adapters
+   features/     ToC, search, zoom, export, theme bridge
+   vendor/mpu/   copied portable MPU source (PlantUML encoder, themes, constants)
+```
 
-## Status
+## Features
 
-Work in progress. See the implementation phases in
-[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+- Mermaid diagrams rendered in-browser (flowchart, sequence, class, state, gantt, ...)
+- PlantUML / Graphviz via a self-hostable PlantUML or Kroki server
+- Math with KaTeX (`$inline$` and `$$block$$`)
+- Syntax highlighting (highlight.js)
+- GitHub-style Markdown: tables, task lists, footnotes, emoji, anchored headings
+- Admonitions: `::: note | tip | info | warning | caution | danger`
+- Table of contents sidebar, in-document search, click-to-zoom diagrams
+- Light / dark theme that recolors diagrams on toggle
+- Copy-code buttons
+- Export: standalone HTML + browser Print-to-PDF
+- HTML/SVG sanitization (DOMPurify); works fully offline when assets are self-hosted
 
-## Quick start
+## Install
+
+### 1. Build the artifact
 
 ```bash
-# 1. Install dev/runtime dependencies
+git clone https://github.com/techcaotri/copyparty-markdown-viewer.git
+cd copyparty-markdown-viewer
 npm install
-
-# 2. Vendor the rendering pipeline from a local MPU checkout (optional; see below)
-MPU_REPO=/path/to/markdown-preview-unified npm run vendor
-
-# 3. Build the single artifact (dist/markdown-plus.js + dist/markdown-plus.css)
-npm run build
-
-# 4. Load it into copyparty
-copyparty --js-browser /abs/path/dist/markdown-plus.js \
-          --css-browser /abs/path/dist/markdown-plus.css
+npm run build          # -> dist/markdown-plus.js + dist/markdown-plus.css
 ```
+
+### 2. Load it into copyparty
+
+```bash
+copyparty \
+  --js-browser  /abs/path/dist/markdown-plus.js \
+  --css-browser /abs/path/dist/markdown-plus.css
+```
+
+Open a `.md` file in the copyparty web UI — it renders with diagrams, math, a ToC,
+search, and export controls (a floating toolbar appears top-right).
+
+> The exact selector copyparty uses for its Markdown viewer varies by version. The
+> plugin detects Markdown views via a MutationObserver + URL heuristics and renders
+> into a known container or its own host. If your copyparty version uses a different
+> container, set `viewerSelector` (see Configuration).
+
+## Configuration
+
+Set `window.MDPLUS_CONFIG` before the bundle loads, using copyparty's `--html-head`:
+
+```bash
+copyparty \
+  --js-browser  /abs/path/dist/markdown-plus.js \
+  --css-browser /abs/path/dist/markdown-plus.css \
+  --html-head '<script>window.MDPLUS_CONFIG={diagramBackend:"kroki",diagramBackendUrl:"/kroki"}</script>'
+```
+
+| Key                 | Default                            | Meaning                                              |
+|---------------------|------------------------------------|------------------------------------------------------|
+| `diagramBackend`    | `"mermaid+puml"`                   | `"mermaid+puml"` or `"kroki"`                         |
+| `diagramBackendUrl` | `null`                             | PlantUML or Kroki base URL (required for PlantUML)    |
+| `diagramFormat`     | `"svg"`                            | `"svg"` or `"png"` for server-rendered diagrams       |
+| `assetBaseUrl`      | `"https://cdn.jsdelivr.net/npm"`   | Where Mermaid + KaTeX CSS are fetched from            |
+| `mermaidUrl`        | `null`                             | Full override for the Mermaid script URL              |
+| `katexCssUrl`       | `null`                             | Full override for the KaTeX CSS URL                   |
+| `mathRenderer`      | `"KaTeX"`                          | `"KaTeX"` or `"none"`                                 |
+| `mermaidSecurityLevel` | `"strict"`                      | Mermaid security level                                |
+| `features`          | all `true`                         | `{ toc, search, zoom, export, copyCode }`             |
+| `theme`             | `"auto"`                           | `"auto"`, `"light"`, or `"dark"`                      |
+| `viewerSelector`    | `null`                             | Explicit CSS selector for copyparty's md container    |
+| `autoInit`          | `true`                             | Observe the DOM and render automatically              |
+
+## Diagram backends
+
+Mermaid and math are fully self-contained (in-browser). **PlantUML/Graphviz need a
+server** because their rendering is not pure JavaScript. Run one yourself — never
+point at a public host for private content.
+
+PlantUML server:
+
+```bash
+docker run -d -p 8080:8080 plantuml/plantuml-server:jetty
+# MDPLUS_CONFIG = { diagramBackend:"mermaid+puml", diagramBackendUrl:"http://localhost:8080" }
+```
+
+Kroki (unified: PlantUML, Graphviz, BPMN, ...):
+
+```bash
+docker run -d -p 8000:8000 yuzutech/kroki
+# MDPLUS_CONFIG = { diagramBackend:"kroki", diagramBackendUrl:"http://localhost:8000" }
+```
+
+Tip: reverse-proxy the diagram server under copyparty's origin (e.g. `/kroki`) to
+keep everything same-origin.
+
+## Offline / air-gapped
+
+By default Mermaid and KaTeX's CSS/fonts load from a CDN. To self-host them:
+
+```bash
+npm run build:assets         # copies KaTeX css/fonts (+ Mermaid if installed) into dist/assets/
+```
+
+Serve `dist/` from copyparty and set:
+
+```js
+window.MDPLUS_CONFIG = {
+  assetBaseUrl: '/.mdplus/dist/assets',
+  mermaidUrl: '/.mdplus/dist/assets/mermaid/mermaid.min.js',
+  katexCssUrl: '/.mdplus/dist/assets/katex/katex.min.css',
+  diagramBackendUrl: '/kroki' // self-hosted diagram server
+};
+```
+
+With a self-hosted diagram server and assets, the plugin makes **no external
+requests**.
+
+## Develop
+
+```bash
+npm run dev          # esbuild watch
+npm run serve:demo   # http://localhost:8099/demo/  (loads dist/, renders a sample)
+npm test             # unit (render + encoder) + jsdom integration test
+```
+
+Project layout:
+
+```
+src/integration/   detector, coordinator, sanitizer, cache, config, library-loader, styles.css, index.js
+src/renderer/      markdown-renderer.js (markdown-it pipeline)
+src/diagrams/      index.js (DiagramManager) + mermaid/plantuml/kroki adapters
+src/features/      index.js (FeatureUI) + toc/search/zoom/export/theme-bridge
+src/vendor/mpu/    copied MPU source (do not edit; re-run the vendor script)
+scripts/           vendor-from-mpu.sh, copy-assets.mjs, serve-demo.mjs
+test/              smoke.mjs, plantuml.mjs, integration.mjs
+build.mjs          esbuild bundler
+```
+
+## Vendoring / sync with MPU
+
+The rendering core is *copied* from MPU, not depended on at runtime. To refresh it
+against a newer MPU checkout:
+
+```bash
+MPU_REPO=/path/to/markdown-preview-unified MPU_PIN=<commit-sha> npm run vendor
+npm run build && npm test
+```
+
+Only portable, low-dependency modules are vendored (PlantUML encoder, Catppuccin
+diagram themes/skinparams, shared constants); the ToC/search/zoom modules are
+re-implemented under `src/features/` following MPU's design. See
+[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+
+## Security
+
+- All rendered Markdown HTML and SVG is sanitized with DOMPurify before injection.
+- Mermaid runs with `securityLevel: "strict"` by default.
+- The PlantUML/Kroki host must be explicitly configured — there is no public default,
+  which avoids leaking private documents and SSRF surprises.
+
+## Troubleshooting
+
+- **Nothing renders:** confirm the bundle is loaded (`--js-browser` path is correct)
+  and check the console. Set `viewerSelector` if your copyparty version uses a
+  different Markdown container.
+- **PlantUML shows the source + an error:** set `diagramBackendUrl` to a reachable
+  PlantUML/Kroki server.
+- **Math is unstyled:** the KaTeX CSS failed to load; self-host it and set
+  `katexCssUrl`, or check CDN access.
+- **Mermaid diagrams missing:** the Mermaid script failed to load; self-host it and
+  set `mermaidUrl`.
 
 ## License
 
-MIT (c) Tri Pham. See [LICENSE](LICENSE).
+MIT © Tri Pham. See [LICENSE](LICENSE).
 
 This plugin vendors source from Markdown-Preview-Unified (MIT) and bundles
 markdown-it, KaTeX, highlight.js, Mermaid, DOMPurify, and pako (each under their
