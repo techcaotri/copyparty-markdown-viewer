@@ -525,7 +525,7 @@ to the Coordinator so a theme toggle can trigger a re-render.
 | FeatureUI            | Facade: build chrome, wire features. | 5 feature classes    |
 | TocPanel             | Build navigable ToC from headings.   | FeatureUI            |
 | SearchController     | In-doc search/highlight/navigate.    | FeatureUI            |
-| ZoomOverlay          | Fullscreen zoom/pan for diagrams.    | FeatureUI            |
+| ZoomOverlay          | Themed framed diagram window.        | FeatureUI            |
 | ExportMenu           | HTML export + print-to-PDF.          | FeatureUI            |
 | ThemeBridge          | Theme toggle that re-renders.        | FeatureUI, Coordinator|
 +----------------------+--------------------------------------+----------------------+
@@ -644,8 +644,8 @@ Each main class is analysed with **What / Who / Where / When / Why / How**.
 |       | well-defined fallback behavior, decoupled from how each step works.      |
 | How   | render(): trigger KaTeX CSS (non-blocking) if math is present; look up    |
 |       | the cache by content hash, else render+sanitize+store; _mount() injects   |
-|       | the HTML into a .mdplus-content article inside the host, hides            |
-|       | copyparty's native #ml/#mp/#toc, and reclaims full width; then mount the  |
+|       | the HTML into a .mdplus-content article inside the host, applies the      |
+|       | theme + width mode, hides #ml/#mp/#toc, reclaims width; then mount the    |
 |       | feature UI FIRST (so it never waits on diagrams) and finally await        |
 |       | diagram processing; dispatch a 'mdplus:rendered' event. resolveTheme()    |
 |       | honors an explicit/saved theme before auto-detecting copyparty's class.  |
@@ -795,7 +795,10 @@ Each main class is analysed with **What / Who / Where / When / Why / How**.
 |       | host.__mdplusChrome), then per render adds copy buttons, rebuilds the    |
 |       | ToC, and (re)attaches zoom and search. The chrome is appended to <body>  |
 |       | (not the host) so its high z-index is not trapped in copyparty's #mw     |
-|       | stacking context. Toolbar clicks dispatch to toc/search/theme/export.   |
+|       | stacking context. Toolbar buttons dispatch to toc/search/width/theme/    |
+|       | export/print. The ToC drawer auto-hides on an outside click (clicks on   |
+|       | the sidebar/toolbar are ignored). The width button toggles .mdplus-wide  |
+|       | on the host and persists the choice; the coordinator re-applies it.      |
 +-------+--------------------------------------------------------------------------+
 ```
 
@@ -814,10 +817,10 @@ Each main class is analysed with **What / Who / Where / When / Why / How**.
 |                  | TreeWalker over text nodes, wrap matches in <mark>, track    |
 |                  | current index, Enter/Shift+Enter to navigate, Esc clears.   |
 +------------------+-------------------------------------------------------------+
-| ZoomOverlay      | What: fullscreen diagram zoom/pan. Who: FeatureUI. Where:    |
+| ZoomOverlay      | What: themed framed diagram window. Who: FeatureUI. Where:   |
 |                  | features/zoom.js. When: click a zoomable diagram. Why:       |
-|                  | inspect detail. How: clone svg/img into a fixed overlay,     |
-|                  | wheel to scale, pointer-drag to pan, buttons/Esc to control. |
+|                  | inspect detail. How: clone svg/img into a centered, themed   |
+|                  | window over a dim backdrop; click outside the frame closes.  |
 +------------------+-------------------------------------------------------------+
 | ExportMenu       | What: client-side export. Who: FeatureUI. Where:            |
 |                  | features/export.js. When: toolbar export/print. Why: save/   |
@@ -1129,6 +1132,65 @@ stateDiagram-v2
 **Explanation.** The plugin moves from Loaded to Initialized once, then cycles between
 Rendering and Interactive per view. Errors degrade gracefully rather than terminating.
 
+### 6.11 Diagram zoom window (sequence)
+
+```mermaid
+%% Opening, interacting with, and closing the themed, framed zoom window.
+sequenceDiagram
+    autonumber
+    actor User as "User"
+    participant Cont as "Content Container (`.mdplus-content`)"
+    participant Zoom as "Zoom Overlay (`ZoomOverlay`)"
+    participant Win as "Zoom Window (`.mdplus-zoom-window`)"
+
+    User->>Cont: click a zoomable diagram
+    Cont->>Zoom: delegated click -> open(diagram)
+    Zoom->>Zoom: ensure overlay (backdrop + window + bar + stage)
+    Zoom->>Zoom: read theme from nearest .mdplus-host
+    Zoom->>Win: set overlay data-mdplus-theme (light/dark)
+    Zoom->>Win: clone svg/img into the stage, reset scale/pan
+    Zoom-->>User: framed window shown over a dim backdrop
+    alt zoom / pan
+        User->>Win: wheel over stage / drag pointer
+        Win->>Win: update transform (scale, translate)
+    end
+    alt close
+        User->>Zoom: click backdrop (target is the overlay)
+        User->>Win: or click close button / press Esc
+        Zoom->>Zoom: remove .open (window hidden)
+    end
+```
+
+**Explanation.** Clicking a diagram is handled by event delegation on the content
+container, which calls `open()`. The overlay (built once) is themed to the current
+light/dark selection by copying the nearest host's `data-mdplus-theme`. The diagram is
+cloned into the stage of a centered, bordered window over a dim backdrop. Wheel/drag
+adjust the transform within the window. Because the window is a centered child, a click
+on the backdrop targets the overlay itself and closes it (close button and Esc also
+work).
+
+### 6.12 View options: full width and ToC auto-hide (activity)
+
+```mermaid
+%% Two view-option behaviors driven from the toolbar / outside clicks.
+flowchart TD
+    WClick["Click width button (↔)"] --> WToggle["Toggle .mdplus-wide on host"]
+    WToggle --> WPersist["Persist 'mdplus-width' to localStorage"]
+    WPersist --> WBtn["Mark button active state"]
+    WPersist --> WApply["Coordinator re-applies on next render"]
+
+    TOpen["Click ToC button (☰)"] --> TToggle["Toggle .open on the sidebar"]
+    Outside["Click anywhere on the page"] --> TCheck{"Sidebar open AND<br/>click outside sidebar/toolbar?"}
+    TCheck -->|"Yes"| THide["Remove .open (auto-hide)"]
+    TCheck -->|"No"| TKeep["Leave sidebar as-is"]
+```
+
+**Explanation.** The width toggle is a pure CSS switch: it flips `.mdplus-wide` on the
+host (so `.mdplus-content` drops its fixed max-width), persists the choice, and the
+coordinator re-applies it on every subsequent render. The ToC drawer opens via its
+toolbar button and auto-hides on any outside click, except clicks on the sidebar
+itself or the toolbar (so the toggle button keeps working).
+
 ---
 
 ## 7. Workflow Deep-Dive: Inputs, Intermediates, Outputs per Phase
@@ -1258,9 +1320,10 @@ through as inert text for Phase 7.
 `<html class="z|y">` > OS preference), tags the host, hides copyparty's native
 loading node, rendered output, and ToC (whose anchors would point into the hidden
 output), and on copyparty's wide-screen layout resets the host's left/right offset so
-the content uses the full width instead of leaving an empty ToC gutter. It then
-creates (or reuses) the `.mdplus-content` article and sets its `innerHTML`. Output:
-the live container element other phases enhance.
+the content uses the full width instead of leaving an empty ToC gutter, and applies
+the persisted content-width mode (`.mdplus-wide`, from `localStorage["mdplus-width"]`).
+It then creates (or reuses) the `.mdplus-content` article and sets its `innerHTML`.
+Output: the live container element other phases enhance.
 
 ### 7.7 Phase 6 — Mount Feature UI
 
@@ -1279,8 +1342,11 @@ the live container element other phases enhance.
 **Elaboration.** `FeatureUI.mountAll()` builds the chrome once (appended to `<body>`
 to escape copyparty's `#mw` stacking context), then per render adds copy buttons,
 rebuilds the ToC from the container's headings, and (re)attaches zoom delegation and
-search. This phase runs before diagrams so the UI is immediately responsive. Output:
-a fully wired UI plus the stored `ctx` that ThemeBridge later reuses to re-render.
+search. The toolbar exposes ToC (`☰`), search (`⌕`), full-width (`↔`), theme (`◐`),
+export (`⤓`), and print (`🖶`) actions; a document-level handler auto-hides the ToC
+drawer on outside clicks. This phase runs before diagrams so the UI is immediately
+responsive. Output: a fully wired UI plus the stored `ctx` that ThemeBridge (and the
+width toggle) later reuse to re-render.
 
 ### 7.8 Phase 7 — Upgrade Diagrams
 
@@ -1339,6 +1405,44 @@ PlantUML images by URL) plus the page's stylesheet references, producing a porta
 `.html` file; viewing it offline requires the referenced styles/assets to be
 reachable (or self-hosted).
 
+### 7.11 Secondary workflow — Full-width Toggle (phase I/O)
+
+```
++----+--------------------+----------------------------+--------------------------+
+| #  | Phase              | Input                      | Output                   |
++----+--------------------+----------------------------+--------------------------+
+| 1  | Toggle class       | width button click         | host .mdplus-wide on/off |
+| 2  | Persist choice     | new state                  | localStorage mdplus-width|
+| 3  | Reflect on button  | new state                  | button active class      |
+| 4  | Re-apply on render | localStorage value         | _mount sets host class   |
++----+--------------------+----------------------------+--------------------------+
+```
+
+**Elaboration.** Toggling is a pure CSS switch (no re-render): flipping `.mdplus-wide`
+on the host makes `.mdplus-content` drop its fixed `max-width: 980px` and span the
+host. The choice persists and the coordinator re-applies it on every later render, so
+the preference survives navigation, theme toggles, and reloads.
+
+### 7.12 Secondary workflow — Diagram Zoom Window (phase I/O)
+
+```
++----+--------------------+----------------------------+--------------------------+
+| #  | Phase              | Input                      | Output                   |
++----+--------------------+----------------------------+--------------------------+
+| 1  | Open               | click a zoomable diagram   | overlay + window shown   |
+| 2  | Theme              | nearest host theme attr    | window themed light/dark |
+| 3  | Load               | cloned svg/img             | diagram in the stage     |
+| 4  | Interact           | wheel / pointer drag       | scale + translate xform  |
+| 5  | Close              | backdrop / close / Esc     | overlay .open removed    |
++----+--------------------+----------------------------+--------------------------+
+```
+
+**Elaboration.** The overlay (built once, attached to `<body>`) is a dim backdrop
+containing a centered, bordered window themed to the current selection. The chosen
+diagram is cloned into the window's stage; wheel and pointer-drag adjust a CSS
+transform. A click on the backdrop (outside the window frame), the close button, or
+Esc closes it.
+
 ---
 
 ## 8. Data Design and Contracts
@@ -1377,12 +1481,18 @@ reachable (or self-hosted).
 | Code fence (post-render)   | <pre class="hljs mdplus-code"><code class=            |
 |                            |   "language-xx">HIGHLIGHTED</code></pre>             |
 | Mounted container          | <article class="mdplus-content"> inside the host;     |
-|                            | host has class mdplus-host + data-mdplus-theme.       |
+|                            | host has class mdplus-host + data-mdplus-theme        |
+|                            | (+ mdplus-wide when full-width mode is on).          |
 | Rendered diagram           | <div class="mdplus-diagram" data-diagram-lang         |
 |                            | [data-zoomable]> with SVG or <img> child.            |
+| Zoom window (DOM)          | <div class="mdplus-zoom-overlay mdplus-host"          |
+|                            | data-mdplus-theme=...> > .mdplus-zoom-window >        |
+|                            | (.mdplus-zoom-bar + .mdplus-zoom-stage).             |
 | Cache key (document)       | FNV-1a hex of the full source text.                  |
 | Cache key (diagram)        | "diag:" + FNV-1a of "lang|theme|source".             |
 | Render context (ctx)       | { filePath, sourceText, host, container }.            |
+| Persisted prefs            | localStorage: mdplus-theme (light|dark),              |
+|                            | mdplus-width (wide|fixed).                           |
 +----------------------------+------------------------------------------------------+
 ```
 
@@ -1420,7 +1530,11 @@ reachable (or self-hosted).
 | Offline / airgap | assetBaseUrl/mermaidUrl/katexCssUrl + self-hosted diagram      |
 |                  | server => zero external requests.                           |
 | Theming          | resolveTheme precedence (explicit/saved > copyparty > OS);    |
-|                  | diagrams recolored on toggle via cache-keyed re-render.       |
+|                  | diagrams recolored on toggle via cache-keyed re-render; the   |
+|                  | zoom window is themed to match.                              |
+| View options     | Full-width toggle and ToC drawer (auto-hide on outside        |
+|                  | click); both persisted/re-applied; chrome on <body> so it is  |
+|                  | never trapped in copyparty's #mw stacking context.           |
 | Compatibility    | DOM/URL detection + known ids, configurable viewerSelector;   |
 |                  | no dependence on copyparty private functions.               |
 +------------------+--------------------------------------------------------------+
@@ -1540,6 +1654,9 @@ build.mjs                         esbuild bundler
 | Take over            | Hiding copyparty's native output and rendering our own.      |
 | Cache-aside          | Check cache, compute on miss, store result.                 |
 | FNV-1a               | The fast non-cryptographic hash used for cache keys.        |
+| Full-width mode      | .mdplus-wide on the host removes the content max-width.      |
+| Backdrop             | The dim layer behind the zoom window; click it to close.     |
+| Zoom window          | The centered, themed, framed diagram viewer.                |
 +----------------------+--------------------------------------------------------------+
 ```
 
