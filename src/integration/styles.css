@@ -48,6 +48,13 @@
   padding: 8px 4px 64px;
 }
 
+/* Full-width mode (toggled from the toolbar): let the content span the host. */
+.mdplus-host.mdplus-wide .mdplus-content {
+  max-width: none;
+  padding-left: 28px;
+  padding-right: 28px;
+}
+
 .mdplus-content h1,
 .mdplus-content h2,
 .mdplus-content h3,
@@ -289,6 +296,10 @@
 }
 .mdplus-tb-btn:hover {
   background: var(--mdp-code-bg, #f6f8fa);
+}
+.mdplus-tb-btn.mdplus-tb-active {
+  background: var(--mdp-code-bg, #f6f8fa);
+  color: var(--mdp-accent, #1e66f5);
 }
 
 .mdplus-sidebar {

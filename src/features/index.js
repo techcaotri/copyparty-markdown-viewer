@@ -61,6 +61,12 @@ export class FeatureUI {
     const f = this.config.features || {};
     if (f.toc !== false) mkBtn('☰', 'Table of contents', 'toc');
     if (f.search !== false) mkBtn('⌕', 'Search (in document)', 'search');
+    const widthBtn = mkBtn('↔', 'Toggle full width', 'width');
+    try {
+      if (localStorage.getItem('mdplus-width') === 'wide') widthBtn.classList.add('mdplus-tb-active');
+    } catch {
+      /* ignore */
+    }
     mkBtn('◐', 'Toggle light/dark theme', 'theme');
     if (f.export !== false) {
       mkBtn('⤓', 'Export to HTML', 'html');
@@ -101,6 +107,14 @@ export class FeatureUI {
       else if (act === 'search') {
         searchBar.classList.toggle('open');
         if (searchBar.classList.contains('open')) input.focus();
+      } else if (act === 'width') {
+        const wide = host.classList.toggle('mdplus-wide');
+        try {
+          localStorage.setItem('mdplus-width', wide ? 'wide' : 'fixed');
+        } catch {
+          /* ignore */
+        }
+        btn.classList.toggle('mdplus-tb-active', wide);
       } else if (act === 'theme') {
         this.theme.toggle(host, chrome.ctx).catch(() => {});
       } else if (act === 'html') {

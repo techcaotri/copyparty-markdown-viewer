@@ -32,6 +32,7 @@ Copyparty (Python)  --js-browser-->  markdown-plus.js (one bundled artifact)
 - Admonitions: `::: note | tip | info | warning | caution | danger`
 - Table of contents sidebar, in-document search, click-to-zoom diagrams
 - Light / dark theme that recolors diagrams on toggle
+- Toggle between a fixed reading column and full screen width (toolbar `↔`, persisted)
 - Copy-code buttons
 - Export: standalone HTML + browser Print-to-PDF
 - HTML/SVG sanitization (DOMPurify); works fully offline when assets are self-hosted

@@ -98,6 +98,15 @@ export class RenderCoordinator {
     hostEl.classList.add('mdplus-host');
     hostEl.setAttribute('data-mdplus-theme', theme);
 
+    // Apply the persisted content-width choice (fixed reading column vs full width).
+    let wide = false;
+    try {
+      wide = localStorage.getItem('mdplus-width') === 'wide';
+    } catch {
+      /* ignore */
+    }
+    hostEl.classList.toggle('mdplus-wide', wide);
+
     // Hide copyparty's native markdown output so ours is authoritative on the
     // markdown viewer page: #ml = "Loading", #mp = copyparty's rendered output,
     // #toc = copyparty's table of contents (its links point into the hidden #mp, so
