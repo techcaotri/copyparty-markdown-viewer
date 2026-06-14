@@ -24,12 +24,18 @@ export class ZoomOverlay {
   _ensureOverlay() {
     if (this.overlay) return;
     const overlay = document.createElement('div');
-    overlay.className = 'mdplus-zoom-overlay';
+    // mdplus-host supplies the themed CSS variables to the windowed viewer.
+    overlay.className = 'mdplus-zoom-overlay mdplus-host';
     overlay.innerHTML =
+      '<div class="mdplus-zoom-window">' +
       '<div class="mdplus-zoom-bar">' +
-      '<button data-act="out">-</button><button data-act="reset">reset</button>' +
-      '<button data-act="in">+</button><button data-act="close">close</button></div>' +
-      '<div class="mdplus-zoom-stage"></div>';
+      '<button data-act="out" title="Zoom out">-</button>' +
+      '<button data-act="reset" title="Reset">reset</button>' +
+      '<button data-act="in" title="Zoom in">+</button>' +
+      '<button data-act="close" title="Close (Esc)">close</button>' +
+      '</div>' +
+      '<div class="mdplus-zoom-stage"></div>' +
+      '</div>';
     document.body.appendChild(overlay);
     this.overlay = overlay;
     this.stage = overlay.querySelector('.mdplus-zoom-stage');
@@ -66,6 +72,10 @@ export class ZoomOverlay {
     this._ensureOverlay();
     const node = diagram.querySelector('svg, img');
     if (!node) return;
+    // Match the window's theme to the currently selected document theme.
+    const themed = diagram.closest('.mdplus-host') || document.querySelector('.mdplus-host');
+    const theme = (themed && themed.getAttribute('data-mdplus-theme')) || 'light';
+    this.overlay.setAttribute('data-mdplus-theme', theme);
     this.stage.innerHTML = '';
     this.stage.appendChild(node.cloneNode(true));
     this.scale = 1;

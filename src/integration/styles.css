@@ -391,50 +391,67 @@ mark.mdplus-hit-active {
 }
 
 /* ---- Zoom overlay ---- */
+/* Dimmed backdrop; the actual viewer is a centered, framed, themed window so the
+   user can click the backdrop (outside the frame) to close. */
 .mdplus-zoom-overlay {
   position: fixed;
   inset: 0;
   z-index: 2147483600;
   display: none;
-  /* Near-opaque backdrop so the page behind does not show through. */
-  background: rgba(12, 12, 16, 0.97);
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
 }
 .mdplus-zoom-overlay.open {
-  display: block;
+  display: flex;
+}
+.mdplus-zoom-window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 90vw;
+  height: 88vh;
+  max-width: 1400px;
+  max-height: 900px;
+  background: var(--mdp-bg, #fff);
+  color: var(--mdp-fg, #1f2328);
+  border: 1px solid var(--mdp-border, #d0d7de);
+  border-radius: 10px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 .mdplus-zoom-bar {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  /* Above the stage (which covers the whole overlay) so buttons are clickable. */
-  z-index: 2;
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--mdp-border, #d0d7de);
+  background: var(--mdp-code-bg, #f6f8fa);
 }
 .mdplus-zoom-bar button {
-  min-width: 40px;
-  height: 34px;
+  min-width: 36px;
+  height: 30px;
   padding: 0 10px;
-  border: 0;
+  border: 1px solid var(--mdp-border, #d0d7de);
   border-radius: 6px;
-  background: #ffffff;
-  color: #1f2328;
+  background: var(--mdp-bg, #fff);
+  color: var(--mdp-fg, #1f2328);
   cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
 }
 .mdplus-zoom-bar button:hover {
-  background: #e9eef5;
+  background: var(--mdp-code-bg, #eef2f7);
 }
 .mdplus-zoom-stage {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+  position: relative;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   cursor: grab;
+  background: var(--mdp-bg, #fff);
 }
 .mdplus-zoom-stage:active {
   cursor: grabbing;
