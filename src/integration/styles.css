@@ -396,7 +396,8 @@ mark.mdplus-hit-active {
   inset: 0;
   z-index: 2147483600;
   display: none;
-  background: rgba(0, 0, 0, 0.85);
+  /* Near-opaque backdrop so the page behind does not show through. */
+  background: rgba(12, 12, 16, 0.97);
 }
 .mdplus-zoom-overlay.open {
   display: block;
@@ -405,22 +406,30 @@ mark.mdplus-hit-active {
   position: absolute;
   top: 12px;
   right: 12px;
+  /* Above the stage (which covers the whole overlay) so buttons are clickable. */
+  z-index: 2;
   display: flex;
   gap: 6px;
 }
 .mdplus-zoom-bar button {
-  min-width: 34px;
-  height: 32px;
+  min-width: 40px;
+  height: 34px;
+  padding: 0 10px;
   border: 0;
   border-radius: 6px;
   background: #ffffff;
   color: #1f2328;
   cursor: pointer;
   font-size: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.mdplus-zoom-bar button:hover {
+  background: #e9eef5;
 }
 .mdplus-zoom-stage {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;

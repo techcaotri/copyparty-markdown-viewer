@@ -124,6 +124,14 @@ export class FeatureUI {
       }
     });
 
+    // Auto-hide the ToC drawer when clicking outside it. Clicks on the toolbar are
+    // ignored so the toggle button keeps working (its handler runs in the same click).
+    document.addEventListener('click', (e) => {
+      if (!tocPanel.classList.contains('open')) return;
+      if (tocPanel.contains(e.target) || toolbar.contains(e.target)) return;
+      tocPanel.classList.remove('open');
+    });
+
     return chrome;
   }
 
