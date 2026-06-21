@@ -43,6 +43,8 @@ Copyparty (Python)  --js-other-->  markdown-plus.js (one bundled artifact)
 - Toggle between a fixed reading column and full screen width (toolbar `↔`, persisted)
 - Copy-code buttons
 - Export: standalone HTML + browser Print-to-PDF
+- Floating toolbar with crisp SVG icons that render everywhere (incl. Android) and
+  enlarge to comfortable tap targets on touch devices
 - HTML/SVG sanitization (DOMPurify); works fully offline when assets are self-hosted
 
 ## Install

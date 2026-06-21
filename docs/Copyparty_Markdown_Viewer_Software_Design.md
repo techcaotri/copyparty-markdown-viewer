@@ -3,18 +3,18 @@
 > A self-contained [copyparty](https://github.com/9001/copyparty) browser plugin that
 > upgrades copyparty's Markdown viewing with Mermaid / PlantUML / Kroki diagrams,
 > KaTeX math, syntax highlighting, a table-of-contents, in-document search, zoomable
-> diagrams, theming, and client-side export — delivered as one bundled JS artifact
-> loaded via copyparty's `--js-other` / `--js-browser` hooks.
+> diagrams, whole-document zoom, theming, and client-side export — delivered as one
+> bundled JS artifact loaded via copyparty's `--js-other` hook.
 
 | Field            | Value                                                            |
 |------------------|-----------------------------------------------------------------|
 | Document type    | Software Design Document (High-Level + Low-Level Design)         |
 | Component        | `copyparty-markdown-viewer` (a.k.a. "mdplus")                    |
 | Version          | 0.1.0                                                            |
-| Date             | 2026-06-14                                                       |
+| Date             | 2026-06-21                                                       |
 | Author context   | techcaotri@gmail.com                                             |
 | Target runtime   | Browser (the copyparty markdown viewer page, `md.html`)          |
-| Verified against | copyparty v1.20.2                                                |
+| Verified against | copyparty v1.20.2 (also deployed on v1.19.17)                    |
 | Build tool       | esbuild (single IIFE bundle, CSS inlined)                        |
 
 ---
@@ -56,7 +56,7 @@ textarea), re-renders it with a richer `markdown-it` pipeline (math, footnotes, 
 lists, admonitions, highlighting), sanitizes the HTML, replaces copyparty's native
 output, upgrades fenced diagram blocks into real diagrams (Mermaid in-browser,
 PlantUML/Graphviz via a configurable server), and mounts a feature UI (toolbar, ToC,
-search, zoom, export, theme toggle).
+search, diagram zoom, whole-document zoom, export, theme toggle).
 
 ### 1.3 Scope
 
@@ -229,6 +229,7 @@ flowchart TB
         Toc["ToC Panel (`TocPanel`)"]
         Search["Search Controller (`SearchController`)"]
         Zoom["Zoom Overlay (`ZoomOverlay`)"]
+        CZoom["Content Zoom (`ContentZoom`)"]
         Export["Export Menu (`ExportMenu`)"]
         Theme["Theme Bridge (`ThemeBridge`)"]
     end
@@ -258,6 +259,7 @@ flowchart TB
     FeatureUI --> Toc
     FeatureUI --> Search
     FeatureUI --> Zoom
+    FeatureUI --> CZoom
     FeatureUI --> Export
     FeatureUI --> Theme
 ```
@@ -289,10 +291,11 @@ by the Coordinator.
 | diagrams/mermaid-adapter   | Render Mermaid in-browser (themed).                |
 | diagrams/plantuml-adapter  | Encode PlantUML -> image from a PlantUML server.    |
 | diagrams/kroki-adapter     | POST to a Kroki server for many diagram types.      |
-| features/index.js          | FeatureUI: build chrome, wire feature controllers.  |
+| features/index.js          | FeatureUI: build chrome (SVG icons), wire features.  |
 | features/toc.js            | Build a navigable table of contents.               |
 | features/search.js         | In-document search + highlight + navigation.        |
 | features/zoom.js           | Fullscreen zoom/pan overlay for diagrams.          |
+| features/content-zoom.js   | Toolbar zoom in/out for the whole document.         |
 | features/export.js         | Standalone HTML export + print-to-PDF.             |
 | features/theme-bridge.js   | Light/dark toggle that re-renders to recolor.       |
 | vendor/mpu/...             | Copied MPU: encoder, themes, constants.            |
@@ -427,6 +430,7 @@ classDiagram
         +TocPanel toc
         +SearchController search
         +ZoomOverlay zoom
+        +ContentZoom contentZoom
         +ExportMenu export
         +ThemeBridge theme
         +mountAll(container, ctx) void
@@ -453,6 +457,16 @@ classDiagram
         +attach(container) void
         +open(diagram) void
         +close() void
+    }
+    class ContentZoom {
+        +number level
+        +Element target
+        +function onChange
+        +apply(container) void
+        +setLevel(v) void
+        +zoomIn() void
+        +zoomOut() void
+        +reset() void
     }
     class ExportMenu {
         +exportHtml(container, ctx) void
@@ -488,6 +502,7 @@ classDiagram
     FeatureUI --> TocPanel
     FeatureUI --> SearchController
     FeatureUI --> ZoomOverlay
+    FeatureUI --> ContentZoom
     FeatureUI --> ExportMenu
     FeatureUI --> ThemeBridge
     ThemeBridge --> RenderCoordinator
@@ -499,7 +514,7 @@ core and holds references to the diagram and feature subsystems (wired after
 construction via setters, which breaks the construction cycle between Coordinator,
 FeatureUI, and ThemeBridge). The three diagram adapters implement a common implicit
 interface (`IDiagramAdapter`) so `DiagramManager` treats them uniformly. `FeatureUI`
-is a facade over five small feature controllers; `ThemeBridge` holds a back-reference
+is a facade over six small feature controllers; `ThemeBridge` holds a back-reference
 to the Coordinator so a theme toggle can trigger a re-render.
 
 #### Class summary table
@@ -526,6 +541,7 @@ to the Coordinator so a theme toggle can trigger a re-render.
 | TocPanel             | Build navigable ToC from headings.   | FeatureUI            |
 | SearchController     | In-doc search/highlight/navigate.    | FeatureUI            |
 | ZoomOverlay          | Themed framed diagram window.        | FeatureUI            |
+| ContentZoom          | Toolbar whole-document zoom in/out.  | FeatureUI            |
 | ExportMenu           | HTML export + print-to-PDF.          | FeatureUI            |
 | ThemeBridge          | Theme toggle that re-renders.        | FeatureUI, Coordinator|
 +----------------------+--------------------------------------+----------------------+
@@ -784,7 +800,7 @@ Each main class is analysed with **What / Who / Where / When / Why / How**.
 ```
 +-------+--------------------------------------------------------------------------+
 | What  | A facade that builds the floating chrome (toolbar, ToC drawer, search bar)|
-|       | and wires the five feature controllers.                                |
+|       | and wires the six feature controllers.                                 |
 | Who   | Built by the plugin with a back-reference to the coordinator; injected    |
 |       | into the coordinator and called by it after each mount.                 |
 | Where | src/features/index.js.                                                  |
@@ -793,12 +809,16 @@ Each main class is analysed with **What / Who / Where / When / Why / How**.
 |       | independent of diagram completion (G6).                                 |
 | How   | mountAll() finds the host, builds chrome once (cached on                 |
 |       | host.__mdplusChrome), then per render adds copy buttons, rebuilds the    |
-|       | ToC, and (re)attaches zoom and search. The chrome is appended to <body>  |
-|       | (not the host) so its high z-index is not trapped in copyparty's #mw     |
-|       | stacking context. Toolbar buttons dispatch to toc/search/width/theme/    |
-|       | export/print. The ToC drawer auto-hides on an outside click (clicks on   |
-|       | the sidebar/toolbar are ignored). The width button toggles .mdplus-wide  |
-|       | on the host and persists the choice; the coordinator re-applies it.      |
+|       | ToC, (re)attaches diagram zoom + search, and applies the persisted       |
+|       | document zoom. The chrome is appended to <body> (not the host) so its    |
+|       | high z-index is not trapped in copyparty's #mw stacking context. Toolbar |
+|       | buttons are inline SVG icons (keyed by data-act, drawn with currentColor |
+|       | so they always render -- incl. on Android -- and recolor for theme/      |
+|       | active states) and dispatch to toc/search/width/zoom-out/zoom-reset/     |
+|       | zoom-in/theme/export/print. The ToC drawer auto-hides on an outside      |
+|       | click (clicks on the sidebar/toolbar are ignored). The width button      |
+|       | toggles .mdplus-wide on the host and persists the choice; the zoom       |
+|       | buttons drive ContentZoom; the coordinator re-applies both on render.    |
 +-------+--------------------------------------------------------------------------+
 ```
 
@@ -821,6 +841,12 @@ Each main class is analysed with **What / Who / Where / When / Why / How**.
 |                  | features/zoom.js. When: click a zoomable diagram. Why:       |
 |                  | inspect detail. How: clone svg/img into a centered, themed   |
 |                  | window over a dim backdrop; click outside the frame closes.  |
++------------------+-------------------------------------------------------------+
+| ContentZoom      | What: whole-document zoom in/out. Who: FeatureUI. Where:     |
+|                  | features/content-zoom.js. When: toolbar -/%/+ buttons. Why:  |
+|                  | legibility (scales font, images, diagrams together). How:   |
+|                  | CSS `zoom` on .mdplus-content (font-size fallback), clamped  |
+|                  | 50-300% in 10% steps, persisted to localStorage[mdplus-zoom].|
 +------------------+-------------------------------------------------------------+
 | ExportMenu       | What: client-side export. Who: FeatureUI. Where:            |
 |                  | features/export.js. When: toolbar export/print. Why: save/   |
@@ -1191,6 +1217,30 @@ coordinator re-applies it on every subsequent render. The ToC drawer opens via i
 toolbar button and auto-hides on any outside click, except clicks on the sidebar
 itself or the toolbar (so the toggle button keeps working).
 
+### 6.13 Document zoom (activity)
+
+```mermaid
+%% ContentZoom driven from the toolbar zoom buttons.
+flowchart TD
+    Click["Click − / % / + (zoom-out/reset/in)"] --> Calc["ContentZoom clamps level<br/>(0.5-3.0, 10% steps)"]
+    Calc --> Persist["Persist 'mdplus-zoom' to localStorage"]
+    Persist --> Apply{"CSS `zoom` supported?"}
+    Apply -->|"Yes"| Zoom["Set .mdplus-content style.zoom"]
+    Apply -->|"No"| Font["Fallback: scale style.fontSize"]
+    Zoom --> Refresh["onChange: update % label,<br/>disable at min/max"]
+    Font --> Refresh
+    ReRender["Next render (any cause)"] --> ReApply["mountAll re-applies persisted level"]
+```
+
+**Explanation.** The zoom buttons call `ContentZoom.zoomIn/zoomOut/reset`, which clamp
+and persist the level then apply it to the `.mdplus-content` element. The CSS `zoom`
+property is used so the font size, images, and diagrams scale together and the layout
+reflows (a `font-size` fallback covers browsers without `zoom`). An `onChange` callback
+refreshes the toolbar (the middle button shows the current percentage and resets on
+click; the out/in buttons disable at the 50%/300% bounds). Because the level is
+persisted and re-applied by `mountAll()` on every render, the zoom survives theme
+toggles, navigation, and reloads.
+
 ---
 
 ## 7. Workflow Deep-Dive: Inputs, Intermediates, Outputs per Phase
@@ -1341,12 +1391,15 @@ Output: the live container element other phases enhance.
 
 **Elaboration.** `FeatureUI.mountAll()` builds the chrome once (appended to `<body>`
 to escape copyparty's `#mw` stacking context), then per render adds copy buttons,
-rebuilds the ToC from the container's headings, and (re)attaches zoom delegation and
-search. The toolbar exposes ToC (`☰`), search (`⌕`), full-width (`↔`), theme (`◐`),
-export (`⤓`), and print (`🖶`) actions; a document-level handler auto-hides the ToC
-drawer on outside clicks. This phase runs before diagrams so the UI is immediately
-responsive. Output: a fully wired UI plus the stored `ctx` that ThemeBridge (and the
-width toggle) later reuse to re-render.
+rebuilds the ToC from the container's headings, (re)attaches diagram-zoom delegation
+and search, and applies the persisted document zoom to the new container. The toolbar
+exposes ToC, search, full-width, document zoom (out / level-reset / in), theme,
+export, and print actions — each an inline SVG icon (so they render reliably on every
+platform, including Android, where the previous printer/download glyphs were missing)
+sized for touch via a `(pointer: coarse)` media query. A document-level handler
+auto-hides the ToC drawer on outside clicks. This phase runs before diagrams so the UI
+is immediately responsive. Output: a fully wired UI plus the stored `ctx` that
+ThemeBridge (and the width/zoom toggles) later reuse.
 
 ### 7.8 Phase 7 — Upgrade Diagrams
 
@@ -1443,6 +1496,25 @@ diagram is cloned into the window's stage; wheel and pointer-drag adjust a CSS
 transform. A click on the backdrop (outside the window frame), the close button, or
 Esc closes it.
 
+### 7.13 Secondary workflow — Document Zoom (phase I/O)
+
+```
++----+--------------------+----------------------------+--------------------------+
+| #  | Phase              | Input                      | Output                   |
++----+--------------------+----------------------------+--------------------------+
+| 1  | Compute level      | button + current level     | clamped level (0.5-3.0)  |
+| 2  | Persist            | new level                  | localStorage mdplus-zoom |
+| 3  | Apply scale        | .mdplus-content element     | style.zoom (or fontSize) |
+| 4  | Refresh toolbar    | new level                  | % label + min/max state  |
+| 5  | Re-apply on render | localStorage value         | mountAll re-applies level|
++----+--------------------+----------------------------+--------------------------+
+```
+
+**Elaboration.** Distinct from the diagram zoom *window* (§7.12), this scales the
+*whole document* via CSS `zoom` on `.mdplus-content` (font-size fallback), so text,
+images, and diagrams grow/shrink together. The level is clamped, persisted, and
+re-applied on every render, mirroring the full-width toggle.
+
 ---
 
 ## 8. Data Design and Contracts
@@ -1462,7 +1534,8 @@ Esc closes it.
 | katexCssUrl          | null            | Full override for the KaTeX CSS URL.      |
 | mathRenderer         | "KaTeX"         | "KaTeX" or "none".                        |
 | mermaidSecurityLevel | "strict"        | Mermaid security level.                   |
-| features             | all true        | { toc, search, zoom, export, copyCode }.  |
+| features             | all true        | { toc, search, zoom, contentZoom, export, |
+|                      |                 | copyCode }.                               |
 | theme                | "auto"          | "auto" / "light" / "dark".                |
 | viewerSelector       | null            | Explicit host selector override.          |
 | autoInit             | true            | Observe + render automatically.           |
@@ -1482,7 +1555,9 @@ Esc closes it.
 |                            |   "language-xx">HIGHLIGHTED</code></pre>             |
 | Mounted container          | <article class="mdplus-content"> inside the host;     |
 |                            | host has class mdplus-host + data-mdplus-theme        |
-|                            | (+ mdplus-wide when full-width mode is on).          |
+|                            | (+ mdplus-wide when full-width mode is on); the       |
+|                            | content carries a style.zoom (or fontSize) when       |
+|                            | document zoom != 100%.                                |
 | Rendered diagram           | <div class="mdplus-diagram" data-diagram-lang         |
 |                            | [data-zoomable]> with SVG or <img> child.            |
 | Zoom window (DOM)          | <div class="mdplus-zoom-overlay mdplus-host"          |
@@ -1492,7 +1567,8 @@ Esc closes it.
 | Cache key (diagram)        | "diag:" + FNV-1a of "lang|theme|source".             |
 | Render context (ctx)       | { filePath, sourceText, host, container }.            |
 | Persisted prefs            | localStorage: mdplus-theme (light|dark),              |
-|                            | mdplus-width (wide|fixed).                           |
+|                            | mdplus-width (wide|fixed), mdplus-zoom (number, e.g.  |
+|                            | 1.3).                                                |
 +----------------------------+------------------------------------------------------+
 ```
 
@@ -1532,9 +1608,13 @@ Esc closes it.
 | Theming          | resolveTheme precedence (explicit/saved > copyparty > OS);    |
 |                  | diagrams recolored on toggle via cache-keyed re-render; the   |
 |                  | zoom window is themed to match.                              |
-| View options     | Full-width toggle and ToC drawer (auto-hide on outside        |
-|                  | click); both persisted/re-applied; chrome on <body> so it is  |
-|                  | never trapped in copyparty's #mw stacking context.           |
+| View options     | Full-width toggle, document zoom (50-300%), and ToC drawer    |
+|                  | (auto-hide on outside click); all persisted/re-applied;       |
+|                  | chrome on <body> so it is never trapped in #mw's context.    |
+| Accessibility /  | Toolbar buttons are inline SVG (currentColor) so they render  |
+| mobile           | on every platform incl. Android (the old printer/download     |
+|                  | glyphs were missing there); a (pointer: coarse) media query   |
+|                  | gives ~44px touch targets; icon buttons carry aria-labels.    |
 | Compatibility    | DOM/URL detection + known ids, configurable viewerSelector;   |
 |                  | no dependence on copyparty private functions.               |
 +------------------+--------------------------------------------------------------+
@@ -1549,8 +1629,9 @@ Esc closes it.
 | copyparty element /  | How mdplus uses it                                          |
 | flag                 |                                                            |
 +----------------------+-------------------------------------------------------------+
-| --js-other           | Primary injection point (the markdown viewer page md.html).  |
-| --js-browser         | Secondary injection (file-browser page; future README use). |
+| --js-other           | The injection point mdplus uses (the markdown viewer page).  |
+| --js-browser         | NOT used by mdplus; free for the companion Video.js plugin   |
+|                      | on the file-browser page (the two coexist on diff. pages).   |
 | --html-head          | Carries window.MDPLUS_CONFIG.                              |
 | `.md?v` URL          | The viewer page is served for a markdown file with ?v.       |
 | textarea#mt          | Source of truth for the raw markdown (read .value).         |
@@ -1568,6 +1649,15 @@ Esc closes it.
 output it replaces, while keeping copyparty's header (`#mh`) functional. Its floating
 chrome is mounted on `<body>` so copyparty's positive-z-index header cannot paint over
 it.
+
+**Deployment note.** Because mdplus loads via `--js-other` and the companion
+[Video.js plugin](https://github.com/techcaotri/copyparty-video-plugin) loads via
+`--js-browser`, both can run in the same copyparty instance without contending for one
+flag. The built bundle is served from a copyparty volume so the browser fetches it
+same-origin while authenticated; in the reference deployment the dev tree is exposed
+read-only (`-v /home/tripham/Dev:/dev:r,...`) and the systemd unit is generated by
+`install_copyparty_service.sh` (per-feature toggles, defaults all on). See the README
+for the launcher and installer.
 
 ---
 
@@ -1628,10 +1718,11 @@ src/diagrams/index.js             DiagramManager
 src/diagrams/mermaid-adapter.js   MermaidAdapter
 src/diagrams/plantuml-adapter.js  PlantUmlAdapter
 src/diagrams/kroki-adapter.js     KrokiAdapter
-src/features/index.js             FeatureUI
+src/features/index.js             FeatureUI (+ SVG toolbar ICONS)
 src/features/toc.js               TocPanel
 src/features/search.js            SearchController
-src/features/zoom.js              ZoomOverlay
+src/features/zoom.js              ZoomOverlay (diagram zoom window)
+src/features/content-zoom.js      ContentZoom (whole-document zoom)
 src/features/export.js            ExportMenu
 src/features/theme-bridge.js      ThemeBridge
 src/vendor/mpu/...                plantuml-encoder, diagram-themes, constants (copied)
@@ -1657,6 +1748,8 @@ build.mjs                         esbuild bundler
 | Full-width mode      | .mdplus-wide on the host removes the content max-width.      |
 | Backdrop             | The dim layer behind the zoom window; click it to close.     |
 | Zoom window          | The centered, themed, framed diagram viewer.                |
+| Document zoom        | Toolbar zoom in/out that CSS-`zoom`s .mdplus-content (font,  |
+|                      | images, diagrams together); distinct from the zoom window.   |
 +----------------------+--------------------------------------------------------------+
 ```
 
