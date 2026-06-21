@@ -37,6 +37,8 @@ Copyparty (Python)  --js-other-->  markdown-plus.js (one bundled artifact)
 - GitHub-style Markdown: tables, task lists, footnotes, emoji, anchored headings
 - Admonitions: `::: note | tip | info | warning | caution | danger`
 - Table of contents sidebar, in-document search, click-to-zoom diagrams
+- Zoom the whole document in/out from the toolbar (`−` / `+`, scales text, images and
+  diagrams together; click the percentage to reset; persisted)
 - Light / dark theme that recolors diagrams on toggle
 - Toggle between a fixed reading column and full screen width (toolbar `↔`, persisted)
 - Copy-code buttons
@@ -189,7 +191,7 @@ copyparty -c /etc/copyparty/args.conf \
 | `katexCssUrl`       | `null`                             | Full override for the KaTeX CSS URL                   |
 | `mathRenderer`      | `"KaTeX"`                          | `"KaTeX"` or `"none"`                                 |
 | `mermaidSecurityLevel` | `"strict"`                      | Mermaid security level                                |
-| `features`          | all `true`                         | `{ toc, search, zoom, export, copyCode }`             |
+| `features`          | all `true`                         | `{ toc, search, zoom, contentZoom, export, copyCode }` |
 | `theme`             | `"auto"`                           | `"auto"`, `"light"`, or `"dark"`                      |
 | `viewerSelector`    | `null`                             | Explicit CSS selector for copyparty's md container    |
 | `autoInit`          | `true`                             | Observe the DOM and render automatically              |

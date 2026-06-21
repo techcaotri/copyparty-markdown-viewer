@@ -8,6 +8,7 @@
 import { TocPanel } from './toc.js';
 import { SearchController } from './search.js';
 import { ZoomOverlay } from './zoom.js';
+import { ContentZoom } from './content-zoom.js';
 import { ExportMenu } from './export.js';
 import { ThemeBridge } from './theme-bridge.js';
 
@@ -18,6 +19,7 @@ export class FeatureUI {
     this.toc = new TocPanel(config);
     this.search = new SearchController(config);
     this.zoom = new ZoomOverlay(config);
+    this.contentZoom = new ContentZoom(config);
     this.export = new ExportMenu(config);
     this.theme = new ThemeBridge(config, coordinator);
   }
@@ -38,6 +40,7 @@ export class FeatureUI {
     if (f.copyCode !== false) this._addCopyButtons(container);
     if (f.toc !== false) this.toc.build(container, chrome.tocPanel);
     if (f.zoom !== false) this.zoom.attach(container);
+    if (f.contentZoom !== false) this.contentZoom.apply(container);
     if (f.search !== false) this.search.attach(container, chrome.searchUI);
 
     chrome.toolbar.style.display = '';
@@ -67,6 +70,27 @@ export class FeatureUI {
     } catch {
       /* ignore */
     }
+
+    // Zoom controls: shrink / current level (click to reset) / enlarge. The CSS `zoom`
+    // applied by ContentZoom scales font size, images, and diagrams together.
+    let zoomOutBtn, zoomLevelBtn, zoomInBtn, refreshZoom;
+    if (f.contentZoom !== false) {
+      zoomOutBtn = mkBtn('−', 'Zoom out', 'zoom-out');
+      zoomLevelBtn = mkBtn('100%', 'Reset zoom', 'zoom-reset');
+      zoomLevelBtn.classList.add('mdplus-tb-zoom-level');
+      zoomInBtn = mkBtn('+', 'Zoom in', 'zoom-in');
+      refreshZoom = (z) => {
+        zoomLevelBtn.textContent = `${z.percent}%`;
+        zoomLevelBtn.classList.toggle('mdplus-tb-active', z.percent !== 100);
+        zoomOutBtn.disabled = z.atMin;
+        zoomInBtn.disabled = z.atMax;
+        zoomOutBtn.title = `Zoom out (${z.percent}%)`;
+        zoomInBtn.title = `Zoom in (${z.percent}%)`;
+      };
+      this.contentZoom.onChange = refreshZoom;
+      refreshZoom(this.contentZoom); // reflect the persisted level immediately
+    }
+
     mkBtn('◐', 'Toggle light/dark theme', 'theme');
     if (f.export !== false) {
       mkBtn('⤓', 'Export to HTML', 'html');
@@ -115,6 +139,12 @@ export class FeatureUI {
           /* ignore */
         }
         btn.classList.toggle('mdplus-tb-active', wide);
+      } else if (act === 'zoom-out') {
+        this.contentZoom.zoomOut();
+      } else if (act === 'zoom-in') {
+        this.contentZoom.zoomIn();
+      } else if (act === 'zoom-reset') {
+        this.contentZoom.reset();
       } else if (act === 'theme') {
         this.theme.toggle(host, chrome.ctx).catch(() => {});
       } else if (act === 'html') {

@@ -301,6 +301,20 @@
   background: var(--mdp-code-bg, #f6f8fa);
   color: var(--mdp-accent, #1e66f5);
 }
+.mdplus-tb-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mdplus-tb-btn:disabled:hover {
+  background: transparent;
+}
+/* Zoom level / reset button shows the current percentage; keep it compact and the
+   digits non-jumpy as the value changes. */
+.mdplus-tb-zoom-level {
+  font-size: 11px;
+  min-width: 42px;
+  font-variant-numeric: tabular-nums;
+}
 
 .mdplus-sidebar {
   position: fixed;
