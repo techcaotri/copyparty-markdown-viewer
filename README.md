@@ -36,7 +36,8 @@ Copyparty (Python)  --js-other-->  markdown-plus.js (one bundled artifact)
 - Syntax highlighting (highlight.js)
 - GitHub-style Markdown: tables, task lists, footnotes, emoji, anchored headings
 - Admonitions: `::: note | tip | info | warning | caution | danger`
-- Table of contents sidebar, in-document search, click-to-zoom diagrams
+- Table of contents sidebar, in-document search, click-to-open diagram/image viewer
+  (wheel + drag on desktop; pinch-zoom, pan, and double-tap on touch)
 - Zoom the whole document in/out from the toolbar (`−` / `+`, scales text, images and
   diagrams together; click the percentage to reset; persisted)
 - Light / dark theme that recolors diagrams on toggle

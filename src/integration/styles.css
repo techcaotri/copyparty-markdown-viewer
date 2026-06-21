@@ -498,6 +498,11 @@ mark.mdplus-hit-active {
   overflow: hidden;
   cursor: grab;
   background: var(--mdp-bg, #fff);
+  /* Hand all touch gestures (pan/pinch) to our pointer handlers instead of letting
+     the browser scroll or page-zoom; also stop text selection / image-drag jank. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .mdplus-zoom-stage:active {
   cursor: grabbing;
@@ -506,6 +511,21 @@ mark.mdplus-hit-active {
   transform-origin: center center;
   max-width: none;
   max-height: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Touch devices: bigger, easier-to-hit controls on the zoom window's bar. */
+@media (pointer: coarse) {
+  .mdplus-zoom-bar {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .mdplus-zoom-bar button {
+    min-width: 48px;
+    height: 40px;
+    font-size: 15px;
+  }
 }
 
 /* ---- Print ---- */

@@ -837,10 +837,12 @@ Each main class is analysed with **What / Who / Where / When / Why / How**.
 |                  | TreeWalker over text nodes, wrap matches in <mark>, track    |
 |                  | current index, Enter/Shift+Enter to navigate, Esc clears.   |
 +------------------+-------------------------------------------------------------+
-| ZoomOverlay      | What: themed framed diagram window. Who: FeatureUI. Where:   |
-|                  | features/zoom.js. When: click a zoomable diagram. Why:       |
-|                  | inspect detail. How: clone svg/img into a centered, themed   |
-|                  | window over a dim backdrop; click outside the frame closes.  |
+| ZoomOverlay      | What: themed framed diagram/image window. Who: FeatureUI.    |
+|                  | Where: features/zoom.js. When: click a zoomable diagram.     |
+|                  | Why: inspect detail. How: clone svg/img into a centered      |
+|                  | themed window; Pointer Events drive wheel/pinch zoom + drag/ |
+|                  | two-finger pan + double-tap (touch-action:none); backdrop/   |
+|                  | close/Esc dismiss.                                          |
 +------------------+-------------------------------------------------------------+
 | ContentZoom      | What: whole-document zoom in/out. Who: FeatureUI. Where:     |
 |                  | features/content-zoom.js. When: toolbar -/%/+ buttons. Why:  |
@@ -1176,9 +1178,9 @@ sequenceDiagram
     Zoom->>Win: set overlay data-mdplus-theme (light/dark)
     Zoom->>Win: clone svg/img into the stage, reset scale/pan
     Zoom-->>User: framed window shown over a dim backdrop
-    alt zoom / pan
-        User->>Win: wheel over stage / drag pointer
-        Win->>Win: update transform (scale, translate)
+    alt zoom / pan (mouse + touch)
+        User->>Win: wheel / drag / pinch / two-finger drag / double-tap
+        Win->>Win: update transform (scale + translate, anchored)
     end
     alt close
         User->>Zoom: click backdrop (target is the overlay)
@@ -1190,10 +1192,13 @@ sequenceDiagram
 **Explanation.** Clicking a diagram is handled by event delegation on the content
 container, which calls `open()`. The overlay (built once) is themed to the current
 light/dark selection by copying the nearest host's `data-mdplus-theme`. The diagram is
-cloned into the stage of a centered, bordered window over a dim backdrop. Wheel/drag
-adjust the transform within the window. Because the window is a centered child, a click
-on the backdrop targets the overlay itself and closes it (close button and Esc also
-work).
+cloned into the stage of a centered, bordered window over a dim backdrop. Input is
+unified through Pointer Events: on a mouse the wheel zooms toward the cursor and
+dragging pans; on touch one finger pans and two fingers pinch-zoom and pan (anchored
+on the midpoint), and a double-tap toggles zoom. The stage sets `touch-action: none`
+so the browser hands these gestures to the plugin instead of scrolling/zooming the
+page. Because the window is a centered child, a click on the backdrop targets the
+overlay itself and closes it (close button and Esc also work).
 
 ### 6.12 View options: full width and ToC auto-hide (activity)
 
@@ -1485,16 +1490,19 @@ the preference survives navigation, theme toggles, and reloads.
 | 1  | Open               | click a zoomable diagram   | overlay + window shown   |
 | 2  | Theme              | nearest host theme attr    | window themed light/dark |
 | 3  | Load               | cloned svg/img             | diagram in the stage     |
-| 4  | Interact           | wheel / pointer drag       | scale + translate xform  |
+| 4  | Interact           | wheel / drag / pinch /     | anchored scale +         |
+|    |                    | two-finger drag / dbl-tap  | translate transform      |
 | 5  | Close              | backdrop / close / Esc     | overlay .open removed    |
 +----+--------------------+----------------------------+--------------------------+
 ```
 
 **Elaboration.** The overlay (built once, attached to `<body>`) is a dim backdrop
 containing a centered, bordered window themed to the current selection. The chosen
-diagram is cloned into the window's stage; wheel and pointer-drag adjust a CSS
-transform. A click on the backdrop (outside the window frame), the close button, or
-Esc closes it.
+diagram/image is cloned into the window's stage; a single Pointer-Events code path
+serves mouse (wheel zoom + drag pan), touch (one-finger pan, two-finger pinch-zoom +
+pan, double-tap), and pen, with `touch-action: none` so the browser does not steal the
+gestures. A click on the backdrop (outside the window frame), the close button, or Esc
+closes it.
 
 ### 7.13 Secondary workflow — Document Zoom (phase I/O)
 
@@ -1614,7 +1622,9 @@ re-applied on every render, mirroring the full-width toggle.
 | Accessibility /  | Toolbar buttons are inline SVG (currentColor) so they render  |
 | mobile           | on every platform incl. Android (the old printer/download     |
 |                  | glyphs were missing there); a (pointer: coarse) media query   |
-|                  | gives ~44px touch targets; icon buttons carry aria-labels.    |
+|                  | gives ~44px touch targets; icon buttons carry aria-labels;    |
+|                  | the zoom window supports pinch-zoom + one/two-finger pan +     |
+|                  | double-tap (touch-action:none) for usable touch gestures.    |
 | Compatibility    | DOM/URL detection + known ids, configurable viewerSelector;   |
 |                  | no dependence on copyparty private functions.               |
 +------------------+--------------------------------------------------------------+
