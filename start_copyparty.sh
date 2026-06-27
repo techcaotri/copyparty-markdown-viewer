@@ -6,7 +6,8 @@
 # the Copyparty Markdown Viewer plugin, so opening a .md file renders Mermaid,
 # PlantUML, math, a table of contents, search, zoom, and export.
 #
-# Based on /home/tripham/bin/start_copyparty.sh.
+# This is the canonical copy. /home/tripham/bin/start_copyparty.sh is a symlink to it,
+# so it can be launched from anywhere on $PATH.
 #
 # How the plugin is loaded:
 #   --js-other   injects the plugin into copyparty's markdown VIEWER page (md.html,
@@ -20,11 +21,14 @@
 
 set -e
 
-COPYPARTY="/opt/copyparty/venv/bin/copyparty"
-CONF="/etc/copyparty/args.conf"
+COPYPARTY="${COPYPARTY:-/opt/copyparty/venv/bin/copyparty}"
+CONF="${CONF:-/etc/copyparty/args.conf}"
 
 # Absolute path to this repo and the URL copyparty serves the built bundle at.
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve symlinks first (e.g. /home/tripham/bin/start_copyparty.sh -> this file) so
+# REPO_DIR points at the real repo no matter how/where the script is invoked.
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]:-$0}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 # /home/tripham/Dev is shared as /dev, so strip that prefix to form the URL path.
 PLUGIN_URL="/dev/${REPO_DIR#/home/tripham/Dev/}/dist/markdown-plus.js"
 
