@@ -275,24 +275,34 @@
   right: 12px;
   z-index: 2147483000;
   display: flex;
+  align-items: center;
   gap: 4px;
   background: var(--mdp-bg, #fff);
   border: 1px solid var(--mdp-border, #d0d7de);
   border-radius: 8px;
-  padding: 4px;
+  padding: 5px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 .mdplus-tb-btn {
-  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
   line-height: 1;
-  min-width: 30px;
-  height: 30px;
+  min-width: 36px;
+  height: 36px;
   padding: 0 8px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--mdp-fg, #1f2328);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mdplus-tb-btn svg {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 .mdplus-tb-btn:hover {
   background: var(--mdp-code-bg, #f6f8fa);
@@ -300,6 +310,42 @@
 .mdplus-tb-btn.mdplus-tb-active {
   background: var(--mdp-code-bg, #f6f8fa);
   color: var(--mdp-accent, #1e66f5);
+}
+.mdplus-tb-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mdplus-tb-btn:disabled:hover {
+  background: transparent;
+}
+/* Zoom level / reset button shows the current percentage; keep it compact and the
+   digits non-jumpy as the value changes. */
+.mdplus-tb-zoom-level {
+  font-size: 12px;
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Touch devices (Android/iOS phones, tablets): enlarge for legibility and to give
+   each control a comfortable ~44px tap target. */
+@media (pointer: coarse) {
+  .mdplus-toolbar {
+    gap: 6px;
+    padding: 6px;
+  }
+  .mdplus-tb-btn {
+    min-width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+  .mdplus-tb-btn svg {
+    width: 26px;
+    height: 26px;
+  }
+  .mdplus-tb-zoom-level {
+    font-size: 14px;
+    min-width: 52px;
+  }
 }
 
 .mdplus-sidebar {
@@ -452,6 +498,11 @@ mark.mdplus-hit-active {
   overflow: hidden;
   cursor: grab;
   background: var(--mdp-bg, #fff);
+  /* Hand all touch gestures (pan/pinch) to our pointer handlers instead of letting
+     the browser scroll or page-zoom; also stop text selection / image-drag jank. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .mdplus-zoom-stage:active {
   cursor: grabbing;
@@ -460,6 +511,21 @@ mark.mdplus-hit-active {
   transform-origin: center center;
   max-width: none;
   max-height: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Touch devices: bigger, easier-to-hit controls on the zoom window's bar. */
+@media (pointer: coarse) {
+  .mdplus-zoom-bar {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .mdplus-zoom-bar button {
+    min-width: 48px;
+    height: 40px;
+    font-size: 15px;
+  }
 }
 
 /* ---- Print ---- */

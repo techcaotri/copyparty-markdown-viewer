@@ -41,7 +41,8 @@ export const DEFAULT_CONFIG = {
   features: {
     toc: true,
     search: true,
-    zoom: true,
+    zoom: true, // click-a-diagram fullscreen zoom overlay
+    contentZoom: true, // toolbar zoom in/out for the whole document
     export: true,
     copyCode: true,
   },

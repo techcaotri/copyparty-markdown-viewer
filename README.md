@@ -8,19 +8,25 @@ that upgrades copyparty's Markdown viewing with **Mermaid** and **PlantUML** dia
 It is built by *vendoring* (copying) the rendering pipeline from the
 [Markdown-Preview-Unified](https://github.com/techcaotri/markdown-preview-enhanced)
 (MPU) project and bundling it into a **single browser artifact** that copyparty loads
-via `--js-browser` / `--css-browser`. There is **no extra service to run** at runtime
-— the only optional external piece is a self-hostable PlantUML/Kroki server, needed
-only for PlantUML/Graphviz diagrams.
+into its Markdown **viewer** page via `--js-other`. There is **no extra service to run**
+at runtime — the only optional external piece is a self-hostable PlantUML/Kroki server,
+needed only for PlantUML/Graphviz diagrams.
 
 ```
-Copyparty (Python)  --js-browser-->  markdown-plus.js (one bundled artifact)
-                                       |
+Copyparty (Python)  --js-other-->  markdown-plus.js (one bundled artifact)
+                                     |
    integration/  detector, coordinator, sanitizer, cache, config, loader
    renderer/     markdown-it pipeline (mirrors MPU engine.ts)
    diagrams/     DiagramManager + Mermaid / PlantUML / Kroki adapters
    features/     ToC, search, zoom, export, theme bridge
    vendor/mpu/   copied portable MPU source (PlantUML encoder, themes, constants)
 ```
+
+> **Loads on the viewer page, not the file browser.** copyparty injects `--js-other`
+> into "all other pages", which includes the Markdown viewer (shown when you open a
+> `.md` with `?v`). `--js-browser` only covers the directory/file-browser page and is
+> left free for other plugins — see [Deploy as a systemd service](#deploy-as-a-systemd-service),
+> where it hosts the companion [Video.js plugin](https://github.com/techcaotri/copyparty-video-plugin).
 
 ## Features
 
@@ -30,11 +36,16 @@ Copyparty (Python)  --js-browser-->  markdown-plus.js (one bundled artifact)
 - Syntax highlighting (highlight.js)
 - GitHub-style Markdown: tables, task lists, footnotes, emoji, anchored headings
 - Admonitions: `::: note | tip | info | warning | caution | danger`
-- Table of contents sidebar, in-document search, click-to-zoom diagrams
+- Table of contents sidebar, in-document search, click-to-open diagram/image viewer
+  (wheel + drag on desktop; pinch-zoom, pan, and double-tap on touch)
+- Zoom the whole document in/out from the toolbar (`−` / `+`, scales text, images and
+  diagrams together; click the percentage to reset; persisted)
 - Light / dark theme that recolors diagrams on toggle
 - Toggle between a fixed reading column and full screen width (toolbar `↔`, persisted)
 - Copy-code buttons
 - Export: standalone HTML + browser Print-to-PDF
+- Floating toolbar with crisp SVG icons that render everywhere (incl. Android) and
+  enlarge to comfortable tap targets on touch devices
 - HTML/SVG sanitization (DOMPurify); works fully offline when assets are self-hosted
 
 ## Install
@@ -45,37 +56,123 @@ Copyparty (Python)  --js-browser-->  markdown-plus.js (one bundled artifact)
 git clone https://github.com/techcaotri/copyparty-markdown-viewer.git
 cd copyparty-markdown-viewer
 npm install
-npm run build          # -> dist/markdown-plus.js + dist/markdown-plus.css
+npm run build          # -> dist/markdown-plus.js (+ dist/markdown-plus.css)
 ```
+
+`dist/` is git-ignored — it is a generated artifact, so rebuild it after pulling.
 
 ### 2. Load it into copyparty
 
-copyparty's **markdown viewer** page (shown when you open a `.md`, i.e. `?v`) is
-injected via **`--js-other`** — not `--js-browser` (which only covers the file-browser
-page). The plugin is a single self-contained JS file and injects its own CSS, so no
-`--css-browser` is needed. The bundle must be reachable by URL; the easiest way is to
-serve it from one of your copyparty volumes.
+copyparty's **Markdown viewer** page (shown when you open a `.md`, i.e. `?v`) is
+injected via **`--js-other`** — *not* `--js-browser` (which only covers the
+file-browser page). The plugin is a single self-contained JS file and injects its own
+CSS, so no `--css-browser` is needed. The bundle must be reachable **by URL**; the
+easiest way is to serve it from one of your copyparty volumes.
 
 ```bash
-# If /home/tripham/Dev is shared as /dev, the built bundle is reachable at
+# Expose your dev tree read-only so the browser can fetch the bundle same-origin.
+# Here /home/tripham/Dev is shared as /dev, so the built bundle is reachable at
 #   /dev/Playground_Copyparty/copyparty-markdown-viewer/dist/markdown-plus.js
 copyparty -c /etc/copyparty/args.conf \
+  -v /home/tripham/Dev:/dev:r,tripham,readuser \
   --js-other  /dev/Playground_Copyparty/copyparty-markdown-viewer/dist/markdown-plus.js \
-  --js-browser /dev/Playground_Copyparty/copyparty-markdown-viewer/dist/markdown-plus.js \
   --html-head '<script>window.MDPLUS_CONFIG={diagramBackend:"mermaid+puml"}</script>'
 ```
-
-Or just use the ready-made launcher (mirrors your `start_copyparty.sh` and adds the
-plugin): [`start_copyparty.sh`](start_copyparty.sh).
 
 Open a `.md` file in the copyparty web UI — it renders with diagrams, math, a ToC,
 search, and export controls (a floating toolbar appears top-right). The plugin reads
 the raw markdown from copyparty's `#mt` textarea, renders into `#mw`, and hides
 copyparty's native output/ToC.
 
-> Verified against copyparty v1.20.2. If a future version changes the viewer DOM,
-> set `viewerSelector` (see Configuration); the detector also falls back to a
-> MutationObserver + URL heuristics.
+> Verified against copyparty v1.20.2; also deployed on v1.19.17. If a future version
+> changes the viewer DOM, set `viewerSelector` (see [Configuration](#configuration));
+> the detector also falls back to a MutationObserver + URL heuristics.
+
+### 3. Or use the launcher
+
+[`start_copyparty.sh`](start_copyparty.sh) is a foreground launcher that mirrors the
+production systemd unit (same binary, same `/etc/copyparty/args.conf`, same `--ftp` /
+`.ts` mime tweaks) and loads **both** local plugins. Use it for local
+testing/development; for a persistent service use the [installer](#deploy-as-a-systemd-service).
+
+```bash
+./start_copyparty.sh                 # Video.js + Markdown viewer (default)
+./start_copyparty.sh --no-videojs    # Markdown viewer only
+./start_copyparty.sh --no-markdown   # Video.js only
+./start_copyparty.sh --no-ftp        # don't start the FTP server
+./start_copyparty.sh -h              # help
+```
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--videojs` / `--no-videojs`   | on | load the Video.js player on the file-browser page (`--js-browser`) |
+| `--markdown` / `--no-markdown` | on | load this Markdown viewer on the viewer page (`--js-other`) |
+| `--ftp` / `--no-ftp`           | on | enable copyparty's FTP server (port `3921`) |
+
+Env overrides: `ENABLE_VIDEOJS`, `ENABLE_MARKDOWN`, `ENABLE_FTP`, `DIAGRAM_BACKEND`,
+`DIAGRAM_BACKEND_URL`, `COPYPARTY`, `CONF`. The launcher auto-builds the bundle if
+`dist/markdown-plus.js` is missing, and adds the read-only `/dev` volume on the command
+line if `args.conf` does not already define it.
+
+## Deploy as a systemd service
+
+For a persistent install, `install_copyparty_service.sh` writes
+`/etc/systemd/system/copyparty.service` wiring up **both** local copyparty
+enhancements, each independently toggleable, and (optionally) adds the read-only
+`/dev` volume to `/etc/copyparty/args.conf` so the browser can load both plugins
+same-origin:
+
+| Plugin / option | Page | copyparty flag | Disable with | Default |
+|-----------------|------|----------------|--------------|---------|
+| [Video.js enhanced player](https://github.com/techcaotri/copyparty-video-plugin) | file browser | `--js-browser` | `--no-videojs` | on |
+| Markdown viewer (this repo) | viewer (`?v`) | `--js-other` + `--html-head` | `--no-markdown` | on |
+| `/dev` read-only volume (`-v /home/tripham/Dev:/dev:r,tripham,readuser`) | — | `args.conf` edit | `--no-dev-volume` | on |
+| FTP server | — | `--ftp 3921` | `--no-ftp` | on |
+
+Because the two plugins live on **different** pages (Video.js on `--js-browser`, the
+Markdown viewer on `--js-other`), they coexist without contending for a single
+option.
+
+The script is published as a secret Gist (it contains machine-specific paths, so it is
+**not** part of this repo):
+
+➡️ **[install_copyparty_service.sh (Gist)](https://gist.github.com/techcaotri/6420fbd61783df624b61d7221eb8c4d0)**
+
+Run it **as your normal user** (so the nvm-based `npm` build works) — it calls `sudo`
+only for the privileged steps and backs up every file it touches. Download it next to
+this repo (it locates both plugin repos relative to its own path):
+
+```bash
+cd /home/tripham/Dev/Playground_Copyparty/copyparty-markdown-viewer
+curl -fsSL https://gist.githubusercontent.com/techcaotri/6420fbd61783df624b61d7221eb8c4d0/raw/install_copyparty_service.sh \
+  -o install_copyparty_service.sh
+chmod +x install_copyparty_service.sh
+
+./install_copyparty_service.sh --dry-run   # preview the plan + rendered unit, change nothing
+./install_copyparty_service.sh             # apply (prompts before writing; --yes to skip)
+```
+
+Examples:
+
+```bash
+./install_copyparty_service.sh --no-videojs     # Markdown viewer + /dev volume only
+./install_copyparty_service.sh --no-markdown     # Video.js only
+./install_copyparty_service.sh --no-dev-volume   # leave args.conf untouched
+./install_copyparty_service.sh --no-ftp --no-restart
+```
+
+What it does, in order: builds the Markdown bundle if missing → appends the `/dev`
+volume to `args.conf` (idempotent, backed up) → renders and installs the unit (backed
+up) → `systemd-analyze verify` → `daemon-reload` + `enable` + `restart`. The resulting
+`ExecStart` (all features on) is:
+
+```
+/home/tripham/.local/bin/copyparty -c /etc/copyparty/args.conf --ftp 3921 \
+  --mime ".ts=video/mp2t" \
+  --js-browser /dev/Playground_Copyparty/copyparty-video-plugin/videojs-enhanced.js \
+  --js-other  /dev/Playground_Copyparty/copyparty-markdown-viewer/dist/markdown-plus.js \
+  --html-head '<script>window.MDPLUS_CONFIG={diagramBackend:"mermaid+puml"}</script>'
+```
 
 ## Configuration
 
@@ -97,10 +194,13 @@ copyparty -c /etc/copyparty/args.conf \
 | `katexCssUrl`       | `null`                             | Full override for the KaTeX CSS URL                   |
 | `mathRenderer`      | `"KaTeX"`                          | `"KaTeX"` or `"none"`                                 |
 | `mermaidSecurityLevel` | `"strict"`                      | Mermaid security level                                |
-| `features`          | all `true`                         | `{ toc, search, zoom, export, copyCode }`             |
+| `features`          | all `true`                         | `{ toc, search, zoom, contentZoom, export, copyCode }` |
 | `theme`             | `"auto"`                           | `"auto"`, `"light"`, or `"dark"`                      |
 | `viewerSelector`    | `null`                             | Explicit CSS selector for copyparty's md container    |
 | `autoInit`          | `true`                             | Observe the DOM and render automatically              |
+
+The launcher and installer build `MDPLUS_CONFIG` from the `DIAGRAM_BACKEND` and
+`DIAGRAM_BACKEND_URL` environment variables.
 
 ## Diagram backends
 
@@ -172,9 +272,13 @@ src/vendor/mpu/    copied MPU source (do not edit; re-run the vendor script)
 scripts/           vendor-from-mpu.sh, copy-assets.mjs, serve-demo.mjs
 test/              smoke.mjs, plantuml.mjs, integration.mjs (jsdom), e2e.mjs (real copyparty)
 examples/          sample.md (feature showcase)
-start_copyparty.sh launcher: your args.conf + the plugin
+start_copyparty.sh foreground launcher: args.conf + Video.js + Markdown viewer (toggleable)
 build.mjs          esbuild bundler
 ```
+
+The systemd installer (`install_copyparty_service.sh`) is kept in a separate Gist
+because it carries machine-specific paths; see
+[Deploy as a systemd service](#deploy-as-a-systemd-service).
 
 ## Vendoring / sync with MPU
 
@@ -197,12 +301,19 @@ re-implemented under `src/features/` following MPU's design. See
 - Mermaid runs with `securityLevel: "strict"` by default.
 - The PlantUML/Kroki host must be explicitly configured — there is no public default,
   which avoids leaking private documents and SSRF surprises.
+- The `/dev` volume is mounted **read-only** for logged-in accounts only
+  (`r,tripham,readuser`) — no anonymous access and no write, so exposing the dev tree
+  to host the bundle cannot be used to modify it.
 
 ## Troubleshooting
 
-- **Nothing renders:** confirm the bundle is loaded (`--js-browser` path is correct)
-  and check the console. Set `viewerSelector` if your copyparty version uses a
-  different Markdown container.
+- **Nothing renders:** confirm the bundle is loaded — the `--js-other` URL must be
+  correct *and* reachable (open it directly in the browser; you should get the JS, not
+  a 404/login page). Check the console. Set `viewerSelector` if your copyparty version
+  uses a different Markdown container.
+- **Bundle 404s / redirects to login:** the `/dev` volume is missing or the file is
+  outside it. Add `-v /home/tripham/Dev:/dev:r,tripham,readuser` (the installer's
+  `/dev volume` step) and make sure you are logged in.
 - **PlantUML shows the source + an error:** set `diagramBackendUrl` to a reachable
   PlantUML/Kroki server.
 - **Math is unstyled:** the KaTeX CSS failed to load; self-host it and set

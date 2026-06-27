@@ -18,5 +18,8 @@ npm-debug.log*
 .tmp/
 *.tgz
 
+# Machine-specific systemd installer (lives in a Gist; see README "Deploy as a systemd service")
+install_copyparty_service.sh
+
 # Generated e2e screenshot
 test/e2e-screenshot.png

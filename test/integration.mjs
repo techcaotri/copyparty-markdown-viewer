@@ -68,6 +68,33 @@ const checks = [
   ['toolbar created', () => !!window.document.querySelector('.mdplus-toolbar')],
   ['toc sidebar created', () => !!window.document.querySelector('.mdplus-sidebar')],
   ['copy buttons added', () => !!app.querySelector('.mdplus-copy-btn')],
+  [
+    'zoom controls created',
+    () =>
+      !!window.document.querySelector('.mdplus-toolbar [data-act="zoom-in"]') &&
+      !!window.document.querySelector('.mdplus-toolbar [data-act="zoom-out"]'),
+  ],
+  [
+    'zoom in enlarges content + updates level',
+    () => {
+      const c = app.querySelector('.mdplus-content');
+      const before = c.style.zoom || c.style.fontSize || '';
+      window.document.querySelector('.mdplus-toolbar [data-act="zoom-in"]').click();
+      const after = c.style.zoom || c.style.fontSize || '';
+      const lvl = window.document.querySelector('.mdplus-tb-zoom-level').textContent;
+      return after !== '' && after !== before && lvl === '110%';
+    },
+  ],
+  [
+    'zoom reset restores 100%',
+    () => {
+      window.document.querySelector('.mdplus-toolbar [data-act="zoom-reset"]').click();
+      const c = app.querySelector('.mdplus-content');
+      const eff = c.style.zoom || c.style.fontSize || ''; // cleared on either mechanism
+      const lvl = window.document.querySelector('.mdplus-tb-zoom-level').textContent;
+      return eff === '' && lvl === '100%';
+    },
+  ],
 ];
 
 let failed = 0;
