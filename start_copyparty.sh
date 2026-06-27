@@ -118,7 +118,30 @@ fi
 
 # ── assemble the argument list ─────────────────────────────────────────────
 ARGS=( -c "$CONF" )
-[ "$ENABLE_FTP" = 1 ] && ARGS+=( --ftp "$FTP_PORT" )
+
+# FTP needs the pyftpdlib module inside copyparty's Python. If it is missing, start
+# WITHOUT FTP (with a hint) instead of letting copyparty crash on import. The
+# production systemd unit does not enable FTP either, so this matches it by default.
+if [ "$ENABLE_FTP" = 1 ]; then
+  _sb=""; IFS= read -r _sb < "$COPYPARTY" 2>/dev/null || true
+  FTP_PY=""
+  case "$_sb" in
+    '#!'*)
+      read -r _w1 _w2 _ <<<"${_sb#\#!}" || true        # split: interpreter (+ optional arg)
+      FTP_PY="$_w1"
+      [ "${FTP_PY##*/}" = env ] && FTP_PY="${_w2:-}"    # "#!/usr/bin/env python3"
+      ;;
+  esac
+  command -v "$FTP_PY" >/dev/null 2>&1 || FTP_PY=""
+  if [ -n "$FTP_PY" ] && "$FTP_PY" -c 'import pyftpdlib' >/dev/null 2>&1; then
+    ARGS+=( --ftp "$FTP_PORT" )
+    echo "[start] ftp     : port $FTP_PORT"
+  else
+    ENABLE_FTP=0
+    echo "[start] ftp     : disabled — pyftpdlib not installed for $COPYPARTY" >&2
+    echo "[start]           enable with: sudo $(dirname "$COPYPARTY")/pip install pyftpdlib" >&2
+  fi
+fi
 ARGS+=( --mime ".ts=video/mp2t" )
 
 # Add the read-only /dev volume only if args.conf does not already define it,
